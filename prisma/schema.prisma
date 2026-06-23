@@ -1,0 +1,342 @@
+// Cactus CMS — Prisma Schema
+// All timestamps are stored in UTC.
+// Run `npm run db:migrate` (prisma migrate dev) for local development.
+// Never use db push — see AGENTS.md.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+model User {
+  id                      String    @id @default(cuid())
+  email                   String    @unique
+  username                String    @unique
+  displayName             String?
+  passwordHash            String?
+  roleId                  String
+  role                    Role      @relation(fields: [roleId], references: [id])
+  emailVerifiedAt         DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+  suspendedAt             DateTime?
+  acceptedPrivacyPolicyAt DateTime?
+
+  passkeys        Passkey[]
+  sessions        Session[]
+  trustedDevices  TrustedDevice[]
+  emailChallenges EmailChallenge[]
+  recoveryRequests RecoveryRequest[]
+  infoPages       InfoPage[]
+  mediaItems      Media[]
+
+  @@index([email])
+  @@index([username])
+}
+
+model Passkey {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  credentialId String   @unique
+  publicKey    Bytes
+  counter      BigInt   @default(0)
+  transports   String[]
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model TrustedDevice {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// Purpose values: 'login_otp' | 'verify_email' | 'recovery'
+model EmailChallenge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  purpose   String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+model RecoveryRequest {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  used      Boolean  @default(false)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Roles and Permissions
+// ---------------------------------------------------------------------------
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  isProtected Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  users       User[]
+  permissions RolePermission[]
+}
+
+// Registry of all permission keys. Core keys registered at startup;
+// module keys registered when a module is installed.
+model Permission {
+  key         String  @id
+  description String?
+  // null = core CMS, otherwise the module name that registered this permission
+  module      String?
+
+  rolePermissions RolePermission[]
+}
+
+model RolePermission {
+  roleId        String
+  role          Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permissionKey String
+  permission    Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+}
+
+// ---------------------------------------------------------------------------
+// Site Configuration (single row, id = "singleton")
+// ---------------------------------------------------------------------------
+
+model SiteConfig {
+  id                     String     @id @default("singleton")
+  siteName               String     @default("My Cactus Site")
+  tagline                String?
+  description            String?
+  timezone               String     @default("UTC")
+  locale                 String     @default("en-GB")
+  dateFormat             String     @default("DD/MM/YYYY")
+  timeFormat             String     @default("HH:mm")
+  adminPath              String     @unique
+  setupCompleted         Boolean    @default(false)
+  status                 SiteStatus @default(comingSoon)
+  hideFromCrawlers       Boolean    @default(true)
+  publicRegistration     Boolean    @default(true)
+  defaultRoleId          String?
+  trustDeviceDays        Int        @default(28)
+  emailFromName          String?
+  emailFromAddress       String?
+  // 'brevo' | 'smtp'
+  emailProvider          String?
+  // 'backblaze' — others added later
+  imageProvider          String?
+  comingSoonPageId       String?
+  maintenancePageId      String?
+  privacyPolicyPageId    String?
+  termsPageId            String?
+  logoMediaId            String?
+  faviconMediaId         String?
+  // Stale-row cleanup periods (days)
+  sessionPurgeAfterDays  Int        @default(30)
+  recoveryPurgeAfterDays Int        @default(7)
+  // Hashed recovery code for the admin account
+  recoveryCodeHash       String?
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+}
+
+enum SiteStatus {
+  live
+  comingSoon
+  maintenance
+}
+
+// ---------------------------------------------------------------------------
+// Info Pages
+// ---------------------------------------------------------------------------
+
+model InfoPage {
+  id              String     @id @default(cuid())
+  slug            String     @unique
+  title           String
+  body            String     @db.Text
+  status          PageStatus @default(draft)
+  metaDescription String?
+  // FK to Media.id — nullable, no Prisma-level relation to avoid circular ref
+  ogImageId       String?
+  // Nullable so content survives if author deletes their account
+  createdById     String?
+  createdBy       User?      @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([slug])
+  @@index([status])
+}
+
+enum PageStatus {
+  draft
+  published
+}
+
+// ---------------------------------------------------------------------------
+// Media
+// ---------------------------------------------------------------------------
+
+model Media {
+  id           String   @id @default(cuid())
+  key          String   @unique
+  provider     String   // 'backblaze'
+  url          String
+  // Nullable so content survives if uploader deletes their account
+  uploadedById String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  altText      String?
+  isDecorative Boolean  @default(false)
+  mimeType     String
+  sizeBytes    Int
+  createdAt    DateTime @default(now())
+
+  @@index([uploadedById])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Themes
+// ---------------------------------------------------------------------------
+
+model Theme {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  // null for bundled themes (e.g., Prickly)
+  repoUrl     String?
+  version     String
+  // Exactly one Theme has isActive = true at any time
+  isActive    Boolean  @default(false)
+  installedAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Modules
+// ---------------------------------------------------------------------------
+
+model Module {
+  id              String       @id @default(cuid())
+  name            String       @unique
+  repoUrl         String
+  version         String
+  // Short unique namespace for this module's database tables
+  tablePrefix     String       @unique
+  status          ModuleStatus @default(pending_install)
+  installedAt     DateTime     @default(now())
+  lastError       String?
+  lastCheckedAt   DateTime?
+  // Set when a newer tagged release is available
+  updateAvailable String?
+  updateNotes     String?      @db.Text
+}
+
+enum ModuleStatus {
+  pending_install
+  deploying
+  active
+  inactive
+  failed
+  update_available
+}
+
+// Applied module SQL migrations, tracked separately from Prisma's own history.
+// The module migration runner checks this before applying any SQL file.
+model ModuleMigration {
+  id            String   @id @default(cuid())
+  moduleName    String
+  migrationName String
+  appliedAt     DateTime @default(now())
+  checksum      String
+
+  @@unique([moduleName, migrationName])
+  @@index([moduleName])
+}
+
+// Singleton lock preventing two concurrent installs/updates
+model DeployLock {
+  id       String   @id @default("singleton")
+  lockedAt DateTime @default(now())
+  // moduleId or themeId holding the lock
+  lockedBy String
+}
+
+// ---------------------------------------------------------------------------
+// Rate Limiting
+// ---------------------------------------------------------------------------
+
+// Lightweight in-database rate limiting.
+// key format: "ip:<address>" or "account:<userId>"
+// action: "login" | "register" | "recovery_request" | "email_code" | ...
+model RateLimit {
+  id          String   @id @default(cuid())
+  key         String
+  action      String
+  attempts    Int      @default(1)
+  windowStart DateTime @default(now())
+
+  @@unique([key, action])
+  @@index([windowStart])
+}
+
+// ---------------------------------------------------------------------------
+// WebAuthn challenge store (transient, short-lived)
+// ---------------------------------------------------------------------------
+
+// Stores the challenge bytes between the options call and the verify call.
+// Cleaned up after use or expiry.
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  // null for new registrations during setup (no user yet), set after
+  userId    String?
+  challenge String   @unique
+  // 'registration' | 'authentication'
+  purpose   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}

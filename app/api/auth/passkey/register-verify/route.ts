@@ -1,0 +1,55 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import type { AuthenticatorTransportFuture } from '@simplewebauthn/server'
+import { verifyRegistration, savePasskey } from '@/lib/auth/passkey'
+import { getSessionFromCookie } from '@/lib/auth/session'
+
+const Body = z.object({
+  userId: z.string().optional(),
+  attestation: z.unknown(),
+  challenge: z.string().optional(),
+})
+
+export async function POST(request: NextRequest) {
+  const parsed = Body.safeParse(await request.json())
+  if (!parsed.success) {
+    return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  }
+
+  let resolvedUserId = parsed.data.userId ?? null
+  if (!resolvedUserId) {
+    const user = await getSessionFromCookie()
+    if (!user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+    resolvedUserId = user.id
+  }
+
+  try {
+    // The challenge is embedded in the attestation response
+    const attestation = parsed.data.attestation as Parameters<typeof verifyRegistration>[1]
+    const clientData = JSON.parse(
+      Buffer.from(
+        (attestation as { response?: { clientDataJSON?: string } })?.response?.clientDataJSON ?? '',
+        'base64'
+      ).toString('utf8')
+    ) as { challenge?: string }
+    const challenge = clientData.challenge ?? ''
+
+    const { verification } = await verifyRegistration(challenge, attestation)
+
+    if (!verification.registrationInfo) {
+      throw new Error('No registration info')
+    }
+
+    await savePasskey(
+      resolvedUserId,
+      verification.registrationInfo,
+      ((attestation as { response?: { transports?: string[] } })?.response?.transports ?? []) as AuthenticatorTransportFuture[]
+    )
+
+    return NextResponse.json({ verified: true })
+  } catch (err: unknown) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : 'Verification failed' }, { status: 400 })
+  }
+}

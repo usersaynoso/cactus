@@ -1,0 +1,59 @@
+// Vercel deployment webhook handler.
+// Verifies the x-vercel-signature header, then updates the Module/Theme status
+// in the database when a deployment succeeds or fails.
+// Pro/Enterprise only — on Hobby this endpoint is never called, and the app
+// falls back to lazy polling on the Modules/Themes page.
+import { NextRequest, NextResponse } from 'next/server'
+import { createHmac } from 'crypto'
+import { prisma } from '@/lib/db/prisma'
+
+type VercelEvent = {
+  type: 'deployment.succeeded' | 'deployment.error' | 'deployment.canceled' | string
+  payload?: {
+    deployment?: { id: string; meta?: Record<string, string> }
+  }
+}
+
+function verifySignature(body: string, signature: string, secret: string): boolean {
+  const expected = createHmac('sha1', secret).update(body).digest('hex')
+  return signature === expected
+}
+
+export async function POST(request: NextRequest) {
+  const secret = process.env.VERCEL_WEBHOOK_SECRET
+  if (!secret) {
+    return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 400 })
+  }
+
+  const body = await request.text()
+  const sig = request.headers.get('x-vercel-signature') ?? ''
+
+  if (!verifySignature(body, sig, secret)) {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  }
+
+  let event: VercelEvent
+  try {
+    event = JSON.parse(body) as VercelEvent
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+
+  // Update all modules/themes in 'deploying' state
+  if (event.type === 'deployment.succeeded') {
+    await prisma.module.updateMany({
+      where: { status: 'deploying' },
+      data: { status: 'active' },
+    })
+    // Release the deploy lock
+    await prisma.deployLock.deleteMany({})
+  } else if (event.type === 'deployment.error' || event.type === 'deployment.canceled') {
+    await prisma.module.updateMany({
+      where: { status: 'deploying' },
+      data: { status: 'failed', lastError: `Deployment ${event.type}` },
+    })
+    await prisma.deployLock.deleteMany({})
+  }
+
+  return NextResponse.json({ ok: true })
+}
