@@ -66,7 +66,7 @@ export default function NewPagePage() {
             <option value="draft">Draft</option>
             <option value="published">Published</option>
           </select>
-          <button className="btn btn-primary" disabled={!title || !slug || loading} onClick={handleSave}>
+          <button className="btn btn-primary" disabled={!title || !slug || loading} onClick={() => handleSave()}>
             {loading ? 'Saving…' : bodyFormat === 'builder' ? 'Create & Open Builder' : 'Save'}
           </button>
         </div>
