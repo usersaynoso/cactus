@@ -65,6 +65,27 @@ export function getEnvStatus(): {
       gates: 'Password login, email verification, account recovery emails',
     },
     {
+      name: 'SMTP_PORT',
+      description: 'SMTP port (e.g. 587 for TLS, 465 for SSL)',
+      required: false,
+      set: !!process.env.SMTP_PORT,
+      gates: 'SMTP email sending',
+    },
+    {
+      name: 'SMTP_USER',
+      description: 'SMTP username / login',
+      required: false,
+      set: !!process.env.SMTP_USER,
+      gates: 'SMTP email sending',
+    },
+    {
+      name: 'SMTP_PASS',
+      description: 'SMTP password or app-specific password',
+      required: false,
+      set: !!process.env.SMTP_PASS,
+      gates: 'SMTP email sending',
+    },
+    {
       name: 'B2_APPLICATION_KEY_ID',
       description: 'Backblaze B2 application key ID',
       required: false,

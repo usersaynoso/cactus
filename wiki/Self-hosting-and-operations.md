@@ -113,3 +113,7 @@ Adding or changing an environment variable requires either:
 - Just saving in Vercel's project settings (for variables that aren't compiled into the build, like `DATABASE_URL`)
 
 After changing `SITE_URL`, you **must** also re-register all passkeys — credentials are bound to the relying party ID (the domain). There is no automated migration for this.
+
+---
+
+**Wiki:** [Home](Home) · [Getting started](Getting-started) · [Architecture overview](Architecture-overview) · [Configuration reference](Configuration-reference) · [Authoring a theme](Authoring-a-theme) · [Authoring a module](Authoring-a-module) · [Self-hosting and operations](Self-hosting-and-operations)

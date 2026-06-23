@@ -19,6 +19,117 @@ type InfoPage = { id: string; title: string }
 const TABS = ['general', 'branding', 'access', 'email', 'media', 'status', 'gdpr', 'integrations'] as const
 type Tab = typeof TABS[number]
 
+// Env var sections: each section has a label, description, and its managed keys.
+type EnvSection = {
+  id: string
+  label: string
+  description: string
+  keys: Array<{ key: string; label: string; type?: 'text' | 'password'; placeholder?: string; hint?: string }>
+}
+
+const EMAIL_BREVO_SECTION: EnvSection = {
+  id: 'email-brevo',
+  label: 'Brevo',
+  description: 'Transactional email via Brevo API',
+  keys: [
+    { key: 'BREVO_API_KEY', label: 'BREVO_API_KEY', type: 'password', placeholder: 'xkeysib-…', hint: 'Create at brevo.com → Settings → API Keys' },
+  ],
+}
+
+const EMAIL_SMTP_SECTION: EnvSection = {
+  id: 'email-smtp',
+  label: 'SMTP',
+  description: 'Transactional email via SMTP',
+  keys: [
+    { key: 'SMTP_HOST', label: 'SMTP_HOST', placeholder: 'smtp.example.com' },
+    { key: 'SMTP_PORT', label: 'SMTP_PORT', placeholder: '587' },
+    { key: 'SMTP_USER', label: 'SMTP_USER', placeholder: 'you@example.com' },
+    { key: 'SMTP_PASS', label: 'SMTP_PASS', type: 'password', placeholder: '••••••••' },
+  ],
+}
+
+const MEDIA_SECTION: EnvSection = {
+  id: 'media',
+  label: 'Backblaze B2 + Cloudflare Worker',
+  description: 'Object storage for images, logo, and favicon',
+  keys: [
+    { key: 'B2_APPLICATION_KEY_ID', label: 'B2_APPLICATION_KEY_ID', placeholder: 'Key ID' },
+    { key: 'B2_APPLICATION_KEY', label: 'B2_APPLICATION_KEY', type: 'password', placeholder: 'Application key' },
+    { key: 'B2_BUCKET_NAME', label: 'B2_BUCKET_NAME', placeholder: 'my-bucket' },
+    { key: 'B2_ENDPOINT', label: 'B2_ENDPOINT', placeholder: 'https://s3.us-east-005.backblazeb2.com' },
+    { key: 'CLOUDFLARE_WORKER_URL', label: 'CLOUDFLARE_WORKER_URL', placeholder: 'https://media.example.com' },
+  ],
+}
+
+const INTEGRATION_SECTIONS: EnvSection[] = [
+  {
+    id: 'github',
+    label: 'GitHub API',
+    description: 'Required for installing and updating modules and themes',
+    keys: [
+      { key: 'GITHUB_API_TOKEN', label: 'GITHUB_API_TOKEN', type: 'password', placeholder: 'ghp_…', hint: 'GitHub → Settings → Developer settings → Personal access tokens' },
+    ],
+  },
+  {
+    id: 'edge-config',
+    label: 'Edge Config',
+    description: 'Fast global reads for admin path and site status (recommended for production)',
+    keys: [
+      { key: 'EDGE_CONFIG', label: 'EDGE_CONFIG', type: 'password', placeholder: 'https://edge-config.vercel.com/…' },
+      { key: 'VERCEL_EDGE_CONFIG_ID', label: 'VERCEL_EDGE_CONFIG_ID', placeholder: 'ecfg_…' },
+    ],
+  },
+  {
+    id: 'turnstile',
+    label: 'Cloudflare Turnstile',
+    description: 'Bot protection on public forms',
+    keys: [
+      { key: 'TURNSTILE_SITE_KEY', label: 'TURNSTILE_SITE_KEY', placeholder: 'Site key' },
+      { key: 'TURNSTILE_SECRET_KEY', label: 'TURNSTILE_SECRET_KEY', type: 'password', placeholder: 'Secret key' },
+    ],
+  },
+  {
+    id: 'webhook',
+    label: 'Vercel Deployment Webhooks',
+    description: 'Real-time deployment status for module/theme installs (Pro/Enterprise only)',
+    keys: [
+      { key: 'VERCEL_WEBHOOK_SECRET', label: 'VERCEL_WEBHOOK_SECRET', type: 'password', placeholder: 'Webhook secret' },
+    ],
+  },
+  {
+    id: 'sentry',
+    label: 'Sentry',
+    description: 'Error reporting; logs to Vercel functions if unset',
+    keys: [
+      { key: 'SENTRY_DSN', label: 'SENTRY_DSN', placeholder: 'https://…@sentry.io/…' },
+    ],
+  },
+  {
+    id: 'neon',
+    label: 'Neon (auto database provisioning)',
+    description: 'Lets Cactus create a Postgres database automatically during setup',
+    keys: [
+      { key: 'NEON_API_KEY', label: 'NEON_API_KEY', type: 'password', placeholder: 'Neon API key' },
+    ],
+  },
+]
+
+function StatusBadge({ set }: { set: boolean }) {
+  return (
+    <span style={{
+      display: 'inline-block',
+      padding: '0.125rem 0.5rem',
+      borderRadius: 9999,
+      fontSize: '0.75rem',
+      fontWeight: 600,
+      background: set ? '#dcfce7' : '#f3f4f6',
+      color: set ? '#15803d' : '#6b7280',
+    }}>
+      {set ? '● Set' : '○ Not set'}
+    </span>
+  )
+}
+
 export default function ConfigPage() {
   const [tab, setTab] = useState<Tab>('general')
   const [config, setConfig] = useState<Partial<SiteConfig>>({})
@@ -28,13 +139,27 @@ export default function ConfigPage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
 
+  // Env var state
+  const [envStatus, setEnvStatus] = useState<Record<string, boolean>>({})
+  const [envFields, setEnvFields] = useState<Record<string, string>>({})
+  const [savingEnvId, setSavingEnvId] = useState<string | null>(null)
+  const [savedEnvId, setSavedEnvId] = useState<string | null>(null)
+  const [envError, setEnvError] = useState('')
+  const [emailMode, setEmailMode] = useState<'brevo' | 'smtp'>('brevo')
+
   useEffect(() => {
     Promise.all([
       fetch('/api/admin/config').then((r) => r.json()),
       fetch('/api/admin/pages?perPage=100').then((r) => r.json()),
-    ]).then(([cfg, pagesData]) => {
+      fetch('/api/admin/env').then((r) => r.json()),
+    ]).then(([cfg, pagesData, envData]) => {
       setConfig(cfg)
       setPages(pagesData.pages ?? [])
+      setEnvStatus((envData as { vars?: Record<string, boolean> }).vars ?? {})
+      // Pre-select SMTP mode if SMTP_HOST is set but BREVO_API_KEY is not
+      if ((envData as { vars?: Record<string, boolean> }).vars?.['SMTP_HOST'] && !(envData as { vars?: Record<string, boolean> }).vars?.['BREVO_API_KEY']) {
+        setEmailMode('smtp')
+      }
       setLoading(false)
     }).catch(() => { setError('Failed to load config'); setLoading(false) })
   }, [])
@@ -60,8 +185,53 @@ export default function ConfigPage() {
     }
   }
 
+  async function handleSaveEnv(sectionId: string, keys: string[]) {
+    setEnvError('')
+    setSavingEnvId(sectionId)
+    setSavedEnvId(null)
+    try {
+      const vars = keys
+        .filter((k) => envFields[k]?.trim())
+        .map((k) => ({ key: k, value: (envFields[k] ?? '').trim() }))
+
+      if (vars.length === 0) {
+        setSavingEnvId(null)
+        return
+      }
+
+      const res = await fetch('/api/admin/env', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vars }),
+      })
+      const d = (await res.json()) as { ok?: boolean; error?: string }
+      if (!res.ok) throw new Error(d.error ?? 'Save failed')
+
+      // Update local status optimistically
+      const updated: Record<string, boolean> = { ...envStatus }
+      keys.forEach((k) => { if (envFields[k]?.trim()) updated[k] = true })
+      setEnvStatus(updated)
+
+      // Clear saved fields (they're now stored in Vercel)
+      const cleared: Record<string, string> = { ...envFields }
+      keys.forEach((k) => { if (envFields[k]?.trim()) cleared[k] = '' })
+      setEnvFields(cleared)
+
+      setSavedEnvId(sectionId)
+      setTimeout(() => setSavedEnvId(null), 3000)
+    } catch (err: unknown) {
+      setEnvError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setSavingEnvId(null)
+    }
+  }
+
   function set(key: keyof SiteConfig, value: unknown) {
     setConfig((prev) => ({ ...prev, [key]: value }))
+  }
+
+  function setEnvField(key: string, value: string) {
+    setEnvFields((prev) => ({ ...prev, [key]: value }))
   }
 
   if (loading) return <p>Loading…</p>
@@ -71,7 +241,57 @@ export default function ConfigPage() {
     email: 'Email', media: 'Media', status: 'Site Status', gdpr: 'GDPR & Legal', integrations: 'Integrations',
   }
 
-  const publishedPages = pages.filter((p: { id: string; title: string } & { status?: string }) => (p as { id: string; title: string; status?: string }).status === 'published' || true)
+  const isEnvSectionSet = (keys: string[]) => keys.some((k) => envStatus[k])
+
+  function EnvSectionCard({ section }: { section: EnvSection }) {
+    const allKeys = section.keys.map((f) => f.key)
+    const hasEntries = allKeys.some((k) => envFields[k]?.trim())
+    const isSaving = savingEnvId === section.id
+    const isSaved = savedEnvId === section.id
+
+    return (
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+          <div>
+            <h3 style={{ margin: '0 0 0.25rem', fontSize: '1rem' }}>{section.label}</h3>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: 0 }}>{section.description}</p>
+          </div>
+          <StatusBadge set={isEnvSectionSet(allKeys)} />
+        </div>
+        {section.keys.map((f) => (
+          <div className="field" key={f.key}>
+            <label style={{ fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
+              <code>{f.key}</code>
+              {envStatus[f.key] && <StatusBadge set />}
+            </label>
+            <input
+              type={f.type ?? 'text'}
+              autoComplete="off"
+              value={envFields[f.key] ?? ''}
+              onChange={(e) => setEnvField(f.key, e.target.value)}
+              placeholder={envStatus[f.key] ? 'Enter new value to change' : (f.placeholder ?? '')}
+              style={{ fontSize: '0.875rem' }}
+            />
+            {f.hint && <span className="field-hint">{f.hint}</span>}
+          </div>
+        ))}
+        {envError && savingEnvId === null && savedEnvId === null && (
+          <div className="alert alert-danger" style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>{envError}</div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <button
+            className="btn btn-primary"
+            style={{ fontSize: '0.875rem' }}
+            disabled={isSaving || !hasEntries}
+            onClick={() => handleSaveEnv(section.id, allKeys)}
+          >
+            {isSaving ? 'Saving…' : isSaved ? '✓ Saved' : 'Save credentials'}
+          </button>
+          <span style={{ fontSize: '0.8125rem', color: '#6b7280' }}>Takes effect on next deployment</span>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ maxWidth: 760 }}>
@@ -138,7 +358,27 @@ export default function ConfigPage() {
         <div>
           <div className="field"><label>From name</label><input value={config.emailFromName ?? ''} onChange={(e) => set('emailFromName', e.target.value)} /></div>
           <div className="field"><label>From address</label><input type="email" value={config.emailFromAddress ?? ''} onChange={(e) => set('emailFromAddress', e.target.value)} /></div>
-          <div className="alert alert-info" style={{ fontSize: '0.875rem' }}>Email provider credentials (API keys, SMTP password) are set via environment variables, not here.</div>
+
+          <hr style={{ border: 'none', borderTop: '1px solid #e5e7eb', margin: '1.5rem 0' }} />
+          <div style={{ marginBottom: '1rem' }}>
+            <div style={{ fontWeight: 600, marginBottom: '0.25rem' }}>Email provider credentials</div>
+            <p style={{ fontSize: '0.875rem', color: '#6b7280', margin: '0 0 0.75rem' }}>
+              Stored in your Vercel project environment variables — never in the database.
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+              <button
+                className={emailMode === 'brevo' ? 'btn btn-primary' : 'btn btn-secondary'}
+                style={{ fontSize: '0.875rem' }}
+                onClick={() => setEmailMode('brevo')}
+              >Brevo</button>
+              <button
+                className={emailMode === 'smtp' ? 'btn btn-primary' : 'btn btn-secondary'}
+                style={{ fontSize: '0.875rem' }}
+                onClick={() => setEmailMode('smtp')}
+              >SMTP</button>
+            </div>
+          </div>
+          <EnvSectionCard section={emailMode === 'brevo' ? EMAIL_BREVO_SECTION : EMAIL_SMTP_SECTION} />
         </div>
       )}
 
@@ -200,30 +440,29 @@ export default function ConfigPage() {
         </div>
       )}
 
-      {tab === 'integrations' && (
-        <div>
-          <div className="card">
-            <h3 style={{ margin: '0 0 0.75rem', fontSize: '1rem' }}>GitHub API</h3>
-            <p style={{ fontSize: '0.9375rem', color: '#6b7280' }}>
-              {process.env.NEXT_PUBLIC_GITHUB_CONFIGURED === 'true'
-                ? '✓ Configured — module/theme installs enabled'
-                : '✗ GITHUB_API_TOKEN not set — install/update buttons disabled'}
-            </p>
-          </div>
-          <div className="card">
-            <h3 style={{ margin: '0 0 0.75rem', fontSize: '1rem' }}>Vercel</h3>
-            <p style={{ fontSize: '0.9375rem', color: '#6b7280' }}>
-              Credentials are set via environment variables. Edge Config writes and deployment status checks depend on VERCEL_API_TOKEN and VERCEL_PROJECT_ID.
-            </p>
-          </div>
+      {tab === 'branding' && (
+        <div className="alert alert-info">
+          Logo and favicon upload requires media (B2 + Cloudflare Worker) to be configured first. Set credentials in the Media tab.
         </div>
       )}
 
-      {(tab === 'branding' || tab === 'media') && (
-        <div className="alert alert-info">
-          {tab === 'branding'
-            ? 'Logo and favicon upload requires media (B2 + Cloudflare Worker) to be configured first.'
-            : 'Media provider: Backblaze B2. Credentials are set via environment variables (B2_APPLICATION_KEY_ID, B2_APPLICATION_KEY, etc.).'}
+      {tab === 'media' && (
+        <div>
+          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+            Media credentials are stored in your Vercel project environment variables and never saved to the database.
+          </p>
+          <EnvSectionCard section={MEDIA_SECTION} />
+        </div>
+      )}
+
+      {tab === 'integrations' && (
+        <div>
+          <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem' }}>
+            All credentials are stored directly in your Vercel project environment variables. Changes take effect on next deployment.
+          </p>
+          {INTEGRATION_SECTIONS.map((section) => (
+            <EnvSectionCard key={section.id} section={section} />
+          ))}
         </div>
       )}
     </div>

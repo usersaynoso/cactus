@@ -243,3 +243,7 @@ export default function Footer({
 ```
 
 That's a complete, working theme. Tag it, create a GitHub Release, and it can be installed in any Cactus site.
+
+---
+
+**Wiki:** [Home](Home) · [Getting started](Getting-started) · [Architecture overview](Architecture-overview) · [Configuration reference](Configuration-reference) · [Authoring a theme](Authoring-a-theme) · [Authoring a module](Authoring-a-module) · [Self-hosting and operations](Self-hosting-and-operations)

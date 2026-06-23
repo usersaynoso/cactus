@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="cactus.svg" width="160" alt="Cactus CMS" />
+</p>
+
 # Cactus CMS
 
 Cactus is a minimal, extensible, fast, and themeable CMS built on Next.js 16, PostgreSQL, and Prisma. It ships with everything you need to run a content site — authentication, site configuration, roles and permissions, info pages, user administration, themes, and a module registry — and nothing you don't.
@@ -12,9 +16,9 @@ Themes work the same way: Prickly ships bundled, any other theme is a public Git
 
 | Page | Contents |
 |------|----------|
-| [Getting started](Getting-started.md) | Prerequisites, cloning, environment variables, first deploy, setup wizard |
-| [Configuration reference](Configuration-reference.md) | Every config-page tab and field |
-| [Architecture overview](Architecture-overview.md) | Request flow, auth, sessions, media pipeline, module system |
-| [Authoring a theme](Authoring-a-theme.md) | Complete guide to building and shipping a Cactus theme |
-| [Authoring a module](Authoring-a-module.md) | Complete guide to building and shipping a Cactus module |
-| [Self-hosting and operations](Self-hosting-and-operations.md) | Backups, stale-row cleanup, monitoring, recovery procedures |
+| [Getting started](Getting-started) | Prerequisites, cloning, environment variables, first deploy, setup wizard |
+| [Configuration reference](Configuration-reference) | Every config-page tab and field |
+| [Architecture overview](Architecture-overview) | Request flow, auth, sessions, media pipeline, module system |
+| [Authoring a theme](Authoring-a-theme) | Complete guide to building and shipping a Cactus theme |
+| [Authoring a module](Authoring-a-module) | Complete guide to building and shipping a Cactus module |
+| [Self-hosting and operations](Self-hosting-and-operations) | Backups, stale-row cleanup, monitoring, recovery procedures |

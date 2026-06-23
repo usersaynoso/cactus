@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, type ReactNode } from 'react'
 import type { EnvVarStatus } from '@/lib/config/env'
 import type { DatabaseState } from '@/app/api/setup/env-check/route'
 import { NEON_REGIONS } from '@/lib/config/neon-regions'
 
-type Step = 'env' | 'account' | 'adminPath' | 'essentials' | 'recovery'
+type Step = 'env' | 'features' | 'account' | 'adminPath' | 'essentials' | 'recovery'
 
 // Sub-states within the 'env' step when DATABASE_URL is absent.
 type DbSubStep =
@@ -71,6 +71,12 @@ export default function SetupPage() {
   const [dbReady, setDbReady] = useState(false)
   const cancelPollingRef = useRef<(() => void) | null>(null)
 
+  // Features step
+  const [featureFields, setFeatureFields] = useState<Record<string, string>>({})
+  const [featureSaving, setFeatureSaving] = useState(false)
+  const [featureError, setFeatureError] = useState('')
+  const [emailMode, setEmailMode] = useState<'brevo' | 'smtp'>('brevo')
+
   // Account fields
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
@@ -81,7 +87,7 @@ export default function SetupPage() {
   const [siteName, setSiteName] = useState('')
   const [timezone, setTimezone] = useState('UTC')
 
-  const steps: Step[] = ['env', 'account', 'adminPath', 'essentials', 'recovery']
+  const steps: Step[] = ['env', 'features', 'account', 'adminPath', 'essentials', 'recovery']
   const stepIndex = steps.indexOf(step)
 
   // Clean up health poll on unmount.
@@ -132,6 +138,41 @@ export default function SetupPage() {
     cancelPollingRef.current = startHealthPolling(() => {
       setDbReady(true)
     })
+  }
+
+  function setFeatureField(key: string, value: string) {
+    setFeatureFields((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function handleFeatures(skip = false) {
+    if (skip) {
+      setStep('account')
+      return
+    }
+    setFeatureError('')
+    setFeatureSaving(true)
+    try {
+      const vars = Object.entries(featureFields)
+        .filter(([, v]) => v.trim() !== '')
+        .map(([key, value]) => ({ key, value }))
+
+      if (vars.length > 0) {
+        const res = await fetch('/api/setup/configure-env', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ vars }),
+        })
+        if (!res.ok) {
+          const d = (await res.json()) as { error?: string }
+          throw new Error(d.error ?? 'Failed to save environment variables')
+        }
+      }
+      setStep('account')
+    } catch (err: unknown) {
+      setFeatureError(err instanceof Error ? err.message : 'Something went wrong')
+    } finally {
+      setFeatureSaving(false)
+    }
   }
 
   async function handleProvision() {
@@ -376,7 +417,7 @@ export default function SetupPage() {
                   </div>
                 ))}
               </div>
-              <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={() => setStep('account')}>
+              <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={() => setStep('features')}>
                 Continue →
               </button>
             </>
@@ -412,7 +453,7 @@ export default function SetupPage() {
 
           {/* Neon call succeeded, Vercel redeploying */}
           {dbSubStep === 'db-redeploying' && (
-            <DbRedeployingPanel dbReady={dbReady} onContinue={() => setStep('account')} />
+            <DbRedeployingPanel dbReady={dbReady} onContinue={() => setStep('features')} />
           )}
 
           {/* Neon call failed: show error + fall back to manual */}
@@ -432,6 +473,170 @@ export default function SetupPage() {
               />
             </div>
           )}
+        </div>
+      )}
+
+      {/* ── Step: OPTIONAL FEATURES ── */}
+      {step === 'features' && (
+        <div>
+          <h2 style={{ margin: '0 0 0.25rem', fontSize: '1.25rem' }}>Configure optional features</h2>
+          <p style={{ color: '#6b7280', fontSize: '0.9375rem', margin: '0 0 0.5rem' }}>
+            Enter credentials for the features you want to enable. You can skip this and configure everything later in Settings.
+          </p>
+          <div className="alert alert-info" style={{ fontSize: '0.8125rem', marginBottom: '1.5rem' }}>
+            Values are saved directly to your Vercel project environment variables and take effect on the next deployment.
+          </div>
+
+          {featureError && <div className="alert alert-danger" style={{ marginBottom: '1rem' }}>{featureError}</div>}
+
+          {/* Email */}
+          <FeatureSection title="Email" description="Required for password login, verification emails, and account recovery.">
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              <button
+                className={emailMode === 'brevo' ? 'btn btn-primary' : 'btn btn-secondary'}
+                style={{ fontSize: '0.875rem' }}
+                onClick={() => setEmailMode('brevo')}
+              >Brevo</button>
+              <button
+                className={emailMode === 'smtp' ? 'btn btn-primary' : 'btn btn-secondary'}
+                style={{ fontSize: '0.875rem' }}
+                onClick={() => setEmailMode('smtp')}
+              >SMTP</button>
+            </div>
+            {emailMode === 'brevo' ? (
+              <div className="field">
+                <label style={{ fontSize: '0.875rem' }}>BREVO_API_KEY</label>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={featureFields['BREVO_API_KEY'] ?? ''}
+                  onChange={(e) => setFeatureField('BREVO_API_KEY', e.target.value)}
+                  placeholder="xkeysib-…"
+                  style={{ fontSize: '0.875rem' }}
+                />
+                <span className="field-hint">Create at brevo.com → Settings → API Keys</span>
+              </div>
+            ) : (
+              <>
+                <div className="field">
+                  <label style={{ fontSize: '0.875rem' }}>SMTP_HOST</label>
+                  <input value={featureFields['SMTP_HOST'] ?? ''} onChange={(e) => setFeatureField('SMTP_HOST', e.target.value)} placeholder="smtp.example.com" style={{ fontSize: '0.875rem' }} />
+                </div>
+                <div className="field">
+                  <label style={{ fontSize: '0.875rem' }}>SMTP_PORT</label>
+                  <input value={featureFields['SMTP_PORT'] ?? ''} onChange={(e) => setFeatureField('SMTP_PORT', e.target.value)} placeholder="587" style={{ fontSize: '0.875rem' }} />
+                </div>
+                <div className="field">
+                  <label style={{ fontSize: '0.875rem' }}>SMTP_USER</label>
+                  <input autoComplete="off" value={featureFields['SMTP_USER'] ?? ''} onChange={(e) => setFeatureField('SMTP_USER', e.target.value)} placeholder="you@example.com" style={{ fontSize: '0.875rem' }} />
+                </div>
+                <div className="field">
+                  <label style={{ fontSize: '0.875rem' }}>SMTP_PASS</label>
+                  <input type="password" autoComplete="new-password" value={featureFields['SMTP_PASS'] ?? ''} onChange={(e) => setFeatureField('SMTP_PASS', e.target.value)} placeholder="••••••••" style={{ fontSize: '0.875rem' }} />
+                </div>
+              </>
+            )}
+          </FeatureSection>
+
+          {/* Media */}
+          <FeatureSection title="Media (Backblaze B2)" description="Required for image uploads, logo, and favicon.">
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>B2_APPLICATION_KEY_ID</label>
+              <input value={featureFields['B2_APPLICATION_KEY_ID'] ?? ''} onChange={(e) => setFeatureField('B2_APPLICATION_KEY_ID', e.target.value)} placeholder="Key ID" style={{ fontSize: '0.875rem' }} />
+            </div>
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>B2_APPLICATION_KEY</label>
+              <input type="password" autoComplete="off" value={featureFields['B2_APPLICATION_KEY'] ?? ''} onChange={(e) => setFeatureField('B2_APPLICATION_KEY', e.target.value)} placeholder="Application key" style={{ fontSize: '0.875rem' }} />
+            </div>
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>B2_BUCKET_NAME</label>
+              <input value={featureFields['B2_BUCKET_NAME'] ?? ''} onChange={(e) => setFeatureField('B2_BUCKET_NAME', e.target.value)} placeholder="my-bucket" style={{ fontSize: '0.875rem' }} />
+            </div>
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>B2_ENDPOINT</label>
+              <input value={featureFields['B2_ENDPOINT'] ?? ''} onChange={(e) => setFeatureField('B2_ENDPOINT', e.target.value)} placeholder="https://s3.us-east-005.backblazeb2.com" style={{ fontSize: '0.875rem' }} />
+            </div>
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>CLOUDFLARE_WORKER_URL</label>
+              <input value={featureFields['CLOUDFLARE_WORKER_URL'] ?? ''} onChange={(e) => setFeatureField('CLOUDFLARE_WORKER_URL', e.target.value)} placeholder="https://media.example.com" style={{ fontSize: '0.875rem' }} />
+            </div>
+          </FeatureSection>
+
+          {/* GitHub */}
+          <FeatureSection title="GitHub" description="Required for installing and updating modules and themes.">
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>GITHUB_API_TOKEN</label>
+              <input type="password" autoComplete="off" value={featureFields['GITHUB_API_TOKEN'] ?? ''} onChange={(e) => setFeatureField('GITHUB_API_TOKEN', e.target.value)} placeholder="ghp_…" style={{ fontSize: '0.875rem' }} />
+              <span className="field-hint">GitHub → Settings → Developer settings → Personal access tokens (repo read/write)</span>
+            </div>
+          </FeatureSection>
+
+          {/* Edge Config */}
+          <FeatureSection title="Edge Config" description="Enables instant global reads for admin path and site status — recommended for production.">
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>EDGE_CONFIG</label>
+              <input type="password" autoComplete="off" value={featureFields['EDGE_CONFIG'] ?? ''} onChange={(e) => setFeatureField('EDGE_CONFIG', e.target.value)} placeholder="https://edge-config.vercel.com/…" style={{ fontSize: '0.875rem' }} />
+            </div>
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>VERCEL_EDGE_CONFIG_ID</label>
+              <input value={featureFields['VERCEL_EDGE_CONFIG_ID'] ?? ''} onChange={(e) => setFeatureField('VERCEL_EDGE_CONFIG_ID', e.target.value)} placeholder="ecfg_…" style={{ fontSize: '0.875rem' }} />
+            </div>
+          </FeatureSection>
+
+          {/* Bot Protection */}
+          <FeatureSection title="Bot Protection (Cloudflare Turnstile)" description="Protects public forms from bots.">
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>TURNSTILE_SITE_KEY</label>
+              <input value={featureFields['TURNSTILE_SITE_KEY'] ?? ''} onChange={(e) => setFeatureField('TURNSTILE_SITE_KEY', e.target.value)} placeholder="Site key" style={{ fontSize: '0.875rem' }} />
+            </div>
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>TURNSTILE_SECRET_KEY</label>
+              <input type="password" autoComplete="off" value={featureFields['TURNSTILE_SECRET_KEY'] ?? ''} onChange={(e) => setFeatureField('TURNSTILE_SECRET_KEY', e.target.value)} placeholder="Secret key" style={{ fontSize: '0.875rem' }} />
+            </div>
+          </FeatureSection>
+
+          {/* Vercel Webhooks */}
+          <FeatureSection title="Vercel Deployment Webhooks" description="Enables real-time deployment status for module/theme installs (Vercel Pro/Enterprise only).">
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>VERCEL_WEBHOOK_SECRET</label>
+              <input type="password" autoComplete="off" value={featureFields['VERCEL_WEBHOOK_SECRET'] ?? ''} onChange={(e) => setFeatureField('VERCEL_WEBHOOK_SECRET', e.target.value)} placeholder="Webhook secret from Vercel" style={{ fontSize: '0.875rem' }} />
+            </div>
+          </FeatureSection>
+
+          {/* Monitoring */}
+          <FeatureSection title="Error Monitoring (Sentry)" description="Reports errors to Sentry; logs to Vercel functions if unset.">
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>SENTRY_DSN</label>
+              <input value={featureFields['SENTRY_DSN'] ?? ''} onChange={(e) => setFeatureField('SENTRY_DSN', e.target.value)} placeholder="https://…@sentry.io/…" style={{ fontSize: '0.875rem' }} />
+            </div>
+          </FeatureSection>
+
+          {/* Neon */}
+          <FeatureSection title="Neon (automatic DB provisioning)" description="Lets future reinstalls create a Postgres database automatically.">
+            <div className="field">
+              <label style={{ fontSize: '0.875rem' }}>NEON_API_KEY</label>
+              <input type="password" autoComplete="off" value={featureFields['NEON_API_KEY'] ?? ''} onChange={(e) => setFeatureField('NEON_API_KEY', e.target.value)} placeholder="Neon API key" style={{ fontSize: '0.875rem' }} />
+            </div>
+          </FeatureSection>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <button
+              className="btn btn-primary btn-lg"
+              style={{ width: '100%' }}
+              disabled={featureSaving}
+              onClick={() => handleFeatures(false)}
+            >
+              {featureSaving ? 'Saving…' : 'Save & continue →'}
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{ width: '100%' }}
+              disabled={featureSaving}
+              onClick={() => handleFeatures(true)}
+            >
+              Skip — I&apos;ll configure this later
+            </button>
+          </div>
         </div>
       )}
 
@@ -589,6 +794,50 @@ export default function SetupPage() {
   )
 }
 
+// ── Collapsible feature section for the optional features step ─────────────────
+
+function FeatureSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div style={{ border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: '0.75rem', overflow: 'hidden' }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          width: '100%',
+          background: open ? '#f0fdf4' : '#f9fafb',
+          border: 'none',
+          padding: '0.75rem 1rem',
+          textAlign: 'left',
+          cursor: 'pointer',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontFamily: 'inherit',
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 600, fontSize: '0.9375rem' }}>{title}</div>
+          <div style={{ fontSize: '0.8125rem', color: '#6b7280' }}>{description}</div>
+        </div>
+        <span style={{ color: '#6b7280', flexShrink: 0, marginLeft: '0.5rem' }}>{open ? '▲' : '▼'}</span>
+      </button>
+      {open && (
+        <div style={{ padding: '1rem', borderTop: '1px solid #e5e7eb' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Sub-components for the database provisioning flow ─────────────────────────
 
 function DbChoicePanel({
@@ -729,7 +978,7 @@ function DbRedeployingPanel({
             <strong>Database connected.</strong> The redeploy is complete and the schema is ready.
           </div>
           <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={onContinue}>
-            Continue to account setup →
+            Continue →
           </button>
         </>
       )}
