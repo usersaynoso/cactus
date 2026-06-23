@@ -1,0 +1,14 @@
+name = "cactus-media-worker"
+main = "index.ts"
+compatibility_date = "2024-01-01"
+
+[build]
+command = "npx tsc --noEmit && echo 'Types OK'"
+
+# Secrets are added via: wrangler secret put <SECRET_NAME>
+# Required secrets:
+#   B2_APPLICATION_KEY_ID
+#   B2_APPLICATION_KEY
+#   B2_BUCKET_NAME
+#   B2_ENDPOINT
+#   ALLOWED_ORIGIN
