@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="cactus.svg" width="160" alt="Cactus CMS" />
+</p>
+
 # 🌵 Cactus CMS
 
 > **A minimal, extensible, fast, and themeable CMS built on Next.js 16.**

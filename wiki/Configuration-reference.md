@@ -93,3 +93,7 @@ These are read from environment variables. Values are never shown.
 | `VERCEL_WEBHOOK_SECRET` | No | Webhook secret for automatic deployment status updates (Pro/Enterprise only). |
 | `TURNSTILE_SITE_KEY` + `TURNSTILE_SECRET_KEY` | No | Cloudflare Turnstile bot protection. |
 | `SENTRY_DSN` | No | Sentry error reporting DSN. |
+
+---
+
+**Wiki:** [Home](Home) · [Getting started](Getting-started) · [Architecture overview](Architecture-overview) · [Configuration reference](Configuration-reference) · [Authoring a theme](Authoring-a-theme) · [Authoring a module](Authoring-a-module) · [Self-hosting and operations](Self-hosting-and-operations)

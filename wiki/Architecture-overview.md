@@ -87,3 +87,7 @@ Module database tables are **prefixed** (`tablePrefix` field, e.g. `forum_`). Th
 Themes live under `themes/<name>/`. Activating a theme is a pure database flag flip (`Theme.isActive`) with no redeploy. Installing a new theme follows the same submodule-commit pattern as a module.
 
 The Prickly theme is bundled in `themes/prickly/` — it is not a submodule. No install step is needed for it.
+
+---
+
+**Wiki:** [Home](Home) · [Getting started](Getting-started) · [Architecture overview](Architecture-overview) · [Configuration reference](Configuration-reference) · [Authoring a theme](Authoring-a-theme) · [Authoring a module](Authoring-a-module) · [Self-hosting and operations](Self-hosting-and-operations)

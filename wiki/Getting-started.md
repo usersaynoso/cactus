@@ -125,3 +125,7 @@ The site defaults to `comingSoon` status. To go live:
 
 1. Go to **Settings → Site Status** and set it to **Live**.
 2. Add optional credentials (email, media, GitHub) as needed — the dashboard shows a banner for each unconfigured feature.
+
+---
+
+**Wiki:** [Home](Home) · [Getting started](Getting-started) · [Architecture overview](Architecture-overview) · [Configuration reference](Configuration-reference) · [Authoring a theme](Authoring-a-theme) · [Authoring a module](Authoring-a-module) · [Self-hosting and operations](Self-hosting-and-operations)

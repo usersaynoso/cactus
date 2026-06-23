@@ -299,3 +299,7 @@ export default async function AnnouncementsPage() {
 ```
 
 That's a complete, installable module. Tag it, release it, and any Cactus site can install it.
+
+---
+
+**Wiki:** [Home](Home) · [Getting started](Getting-started) · [Architecture overview](Architecture-overview) · [Configuration reference](Configuration-reference) · [Authoring a theme](Authoring-a-theme) · [Authoring a module](Authoring-a-module) · [Self-hosting and operations](Self-hosting-and-operations)
