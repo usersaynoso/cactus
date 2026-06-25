@@ -169,8 +169,7 @@ export default function ConfigPage() {
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [resetting, setResetting] = useState(false)
   const [resetDone, setResetDone] = useState(false)
-  const [resetRedeployed, setResetRedeployed] = useState(false)
-  const [resetRedeployError, setResetRedeployError] = useState('')
+  const [resetPartialError, setResetPartialError] = useState('')
   const [resetError, setResetError] = useState('')
 
   // Media provider state
@@ -559,8 +558,8 @@ export default function ConfigPage() {
                 <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#dc2626' }}>Are you sure?</h3>
                 <p style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
                   This will <strong>permanently delete all environment variables</strong> from your Vercel project —
-                  email credentials, media provider keys, integrations, and everything else. Your site will stop
-                  working until you redeploy and reconfigure it from scratch.
+                  email credentials, media provider keys, integrations, and everything else.
+                  A redeployment will be triggered automatically. You will need to reconfigure these settings afterwards.
                 </p>
                 {resetError && <div className="alert alert-danger" style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>{resetError}</div>}
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -572,12 +571,13 @@ export default function ConfigPage() {
                       setResetError('')
                       try {
                         const res = await fetch('/api/admin/env', { method: 'DELETE' })
-                        const d = (await res.json()) as { ok?: boolean; error?: string; redeployTriggered?: boolean; redeployError?: string; failed?: Array<{ key: string; error: string }> }
+                        const d = (await res.json()) as { ok?: boolean; error?: string; failed?: Array<{ key: string; error: string }> }
                         if (!res.ok) throw new Error(d.error ?? 'Reset failed')
                         setEnvStatus({})
                         setShowResetConfirm(false)
-                        setResetRedeployed(d.redeployTriggered ?? false)
-                        setResetRedeployError(d.redeployError ?? '')
+                        if (d.failed && d.failed.length > 0) {
+                          setResetPartialError(`${d.failed.length} variable(s) could not be deleted: ${d.failed.map((f) => f.key).join(', ')}`)
+                        }
                         setResetDone(true)
                       } catch (err: unknown) {
                         setResetError(err instanceof Error ? err.message : 'Reset failed')
@@ -596,13 +596,12 @@ export default function ConfigPage() {
             )}
             {resetDone && (
               <div className="alert alert-info">
-                All environment variables have been removed.{' '}
-                {resetRedeployed
-                  ? 'A redeployment has been triggered — your site will be live with factory settings in a few minutes.'
-                  : resetRedeployError
-                    ? <>Automatic redeploy failed ({resetRedeployError}). Please <strong>redeploy manually in Vercel</strong> for the changes to take effect.</>
-                    : <>Please <strong>redeploy manually in Vercel</strong> for the changes to take effect.</>
-                }
+                Environment variables removed. A redeployment has been triggered — your site will restart with factory settings in a few minutes.
+                {resetPartialError && (
+                  <div style={{ marginTop: '0.5rem', color: '#b45309', fontSize: '0.875rem' }}>
+                    Warning: {resetPartialError}
+                  </div>
+                )}
               </div>
             )}
           </div>
