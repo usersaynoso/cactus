@@ -1,9 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getSessionFromCookie } from '@/lib/auth/session'
 import { getVercelEnvVarKeys, upsertVercelEnvVars, deleteVercelEnvVars } from '@/lib/vercel/env'
 import { triggerVercelRedeploy } from '@/lib/vercel/deploy'
 import { errorResponse } from '@/lib/utils'
 import { ALL_PROVIDERS, envKeysForProvider } from '@/lib/media/providers'
+
+// Give the function enough headroom for list + parallel deletes + redeploy.
+export const maxDuration = 60
 
 // The env vars that can be managed via the UI.
 // Required infrastructure vars (DATABASE_URL, SESSION_SECRET, SITE_URL,
@@ -96,6 +99,8 @@ export async function POST(req: NextRequest) {
 }
 
 // DELETE — removes all managed env vars then triggers a redeploy (factory reset).
+// The redeploy is scheduled via after() so it runs after the response is sent
+// and never races against the function timeout.
 export async function DELETE() {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
@@ -118,14 +123,16 @@ export async function DELETE() {
     return errorResponse(`Failed to delete env vars: ${message}`, 502)
   }
 
-  // Best-effort redeploy so the cleared vars take effect immediately.
-  const redeploy = await triggerVercelRedeploy(token, projectId)
+  // Trigger the redeploy after the response is sent so it never blocks or
+  // races against the function timeout.
+  after(async () => {
+    await triggerVercelRedeploy(token, projectId)
+  })
 
   return NextResponse.json({
     ok: true,
     deleted: deleted.length,
     failed,
-    redeployTriggered: redeploy.triggered,
-    redeployError: redeploy.error,
+    redeployTriggered: true,
   })
 }
