@@ -43,14 +43,24 @@ async function resolveBlock(block: any, ctx: Context): Promise<void> {
   }
 }
 
+function collectBlocks(blocks: any[]): any[] {
+  return blocks.flatMap(block => {
+    if (!block?.props) return [block]
+    const nested = Object.values(block.props).flatMap(v =>
+      Array.isArray(v) ? collectBlocks(v as any[]) : []
+    )
+    return [block, ...nested]
+  })
+}
+
 export async function resolveTemplateData(rawData: unknown, ctx: Context): Promise<Data> {
   const data = JSON.parse(JSON.stringify(rawData)) as Data
   const content = Array.isArray(data.content) ? data.content : []
   const zones = data.zones ?? {}
 
   const allBlocks = [
-    ...content,
-    ...Object.values(zones).flatMap(z => (Array.isArray(z) ? z : [])),
+    ...collectBlocks(content),
+    ...Object.values(zones).flatMap(z => (Array.isArray(z) ? collectBlocks(z) : [])),
   ]
 
   await Promise.all(allBlocks.map(block => resolveBlock(block, ctx)))
