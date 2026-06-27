@@ -35,13 +35,31 @@ const STARTERS_BY_TYPE: Record<string, Starter[]> = {
       builderData: { content: [], root: { props: {} }, zones: {} },
     },
     {
-      key: 'logo-menu',
-      name: 'Logo Left + Menu Right',
-      description: 'Standard site header with logo on the left and navigation on the right.',
+      key: 'logo-nav-right',
+      name: 'Logo Left + Nav Right',
+      description: 'Standard header with logo on the left and navigation on the right.',
       builderData: {
-        content: [{ type: 'SiteHeader', props: { id: 'site-header-1', sticky: true, bgMode: 'color', height: 64, maxWidth: 1200, borderBottom: true } }],
-        root: { props: {} },
-        zones: {},
+        content: [{ type: 'Columns', props: { id: 'cols-1', columns: '3', align: 'center', gap: 'lg', padding: 'none' } }],
+        root: { props: { height: '64px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
+        zones: {
+          'cols-1:left':   [{ type: 'SiteLogo',  props: { id: 'logo-1' } }],
+          'cols-1:center': [],
+          'cols-1:right':  [{ type: 'MenuBlock', props: { id: 'menu-1' } }],
+        },
+      },
+    },
+    {
+      key: 'logo-centred-nav',
+      name: 'Logo + Centred Nav',
+      description: 'Logo on the left with navigation centred across the header.',
+      builderData: {
+        content: [{ type: 'Columns', props: { id: 'cols-1', columns: '3', align: 'center', gap: 'lg', padding: 'none' } }],
+        root: { props: { height: '64px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
+        zones: {
+          'cols-1:left':   [{ type: 'SiteLogo',  props: { id: 'logo-1' } }],
+          'cols-1:center': [{ type: 'MenuBlock', props: { id: 'menu-1' } }],
+          'cols-1:right':  [],
+        },
       },
     },
   ],

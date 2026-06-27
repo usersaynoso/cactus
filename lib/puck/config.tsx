@@ -184,7 +184,21 @@ function SiteHeaderBlock(props: any) {
 }
 
 function Columns(props: any) {
-  const { puck, ratio, padding } = props
+  const { puck, columns = '2', ratio, align = 'stretch', gap = 'md', padding } = props
+  const alignMap: Record<string, string> = { stretch: 'stretch', start: 'flex-start', center: 'center', end: 'flex-end' }
+  const alignItems = alignMap[align] ?? 'stretch'
+  const gapValue = GAP_MAP[gap] ?? '1rem'
+
+  if (columns === '3') {
+    return (
+      <div style={{ width: '100%', display: 'flex', alignItems, gap: gapValue, marginBottom: padding === 'none' ? 0 : '1.5rem', padding: getPadding(padding) }}>
+        <div style={{ flexShrink: 0, minWidth: 0 }}>{puck?.renderDropZone?.({ zone: 'left' })}</div>
+        <div style={{ flex: '1 1 0%', display: 'flex', justifyContent: 'center', minWidth: 0 }}>{puck?.renderDropZone?.({ zone: 'center' })}</div>
+        <div style={{ flexShrink: 0, minWidth: 0 }}>{puck?.renderDropZone?.({ zone: 'right' })}</div>
+      </div>
+    )
+  }
+
   const ratios: Record<string, [string, string]> = {
     '50/50': ['1 1 50%', '1 1 50%'],
     '60/40': ['1 1 60%', '1 1 40%'],
@@ -194,27 +208,9 @@ function Columns(props: any) {
   }
   const pair = ratios[ratio] ?? ratios['50/50']!
   return (
-    <div style={{ width: '100%', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', marginBottom: padding === 'none' ? 0 : '1.5rem', padding: getPadding(padding) }}>
+    <div style={{ width: '100%', display: 'flex', alignItems, gap: gapValue, flexWrap: 'wrap', marginBottom: padding === 'none' ? 0 : '1.5rem', padding: getPadding(padding) }}>
       <div style={{ flex: pair[0], minWidth: 200 }}>{puck?.renderDropZone?.({ zone: 'left' })}</div>
       <div style={{ flex: pair[1], minWidth: 200 }}>{puck?.renderDropZone?.({ zone: 'right' })}</div>
-    </div>
-  )
-}
-
-function HeaderRow(props: any) {
-  const { puck, gap = 'lg' } = props
-  const gapValue = GAP_MAP[gap] ?? '2rem'
-  return (
-    <div style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', gap: gapValue }}>
-      <div style={{ flexShrink: 0 }}>
-        {puck?.renderDropZone?.({ zone: 'left' })}
-      </div>
-      <div style={{ flex: '1 1 0%', display: 'flex', justifyContent: 'center' }}>
-        {puck?.renderDropZone?.({ zone: 'center' })}
-      </div>
-      <div style={{ flexShrink: 0 }}>
-        {puck?.renderDropZone?.({ zone: 'right' })}
-      </div>
     </div>
   )
 }
@@ -884,10 +880,13 @@ const puckConfig = {
     Columns: {
       label: 'Columns',
       fields: {
-        ratio: { type: 'select' as const, label: 'Column ratio', options: [{ value: '50/50', label: '50 / 50' }, { value: '60/40', label: '60 / 40' }, { value: '40/60', label: '40 / 60' }, { value: '70/30', label: '70 / 30' }, { value: '30/70', label: '30 / 70' }] },
+        columns: { type: 'select' as const, label: 'Number of columns', options: [{ value: '2', label: '2 columns' }, { value: '3', label: '3 columns (left / centre / right)' }] },
+        ratio:   { type: 'select' as const, label: 'Column ratio (2-col only)', options: [{ value: '50/50', label: '50 / 50' }, { value: '60/40', label: '60 / 40' }, { value: '40/60', label: '40 / 60' }, { value: '70/30', label: '70 / 30' }, { value: '30/70', label: '30 / 70' }] },
+        align:   { type: 'select' as const, label: 'Vertical align', options: [{ value: 'stretch', label: 'Stretch' }, { value: 'start', label: 'Top' }, { value: 'center', label: 'Middle' }, { value: 'end', label: 'Bottom' }] },
+        gap:     { type: 'select' as const, label: 'Gap', options: [{ value: 'none', label: 'None' }, { value: 'sm', label: 'Small' }, { value: 'md', label: 'Medium' }, { value: 'lg', label: 'Large' }] },
         padding: paddingField,
       },
-      defaultProps: { ratio: '50/50', padding: 'none' },
+      defaultProps: { columns: '2', ratio: '50/50', align: 'stretch', gap: 'md', padding: 'none' },
       render: Columns,
     },
     Spacer: {
@@ -1283,7 +1282,7 @@ const headerRootRender = ({ children, bgMode = 'color', bgColor = '', height = '
 export const headerPuckConfig = {
   categories: {
     site:   { title: 'Site',      components: ['SiteLogo', 'MenuBlock', 'LoginButton', 'ThemeToggle'], defaultExpanded: true },
-    layout: { title: 'Structure', components: ['HeaderRow', 'Flex', 'Columns', 'Spacer'], defaultExpanded: true },
+    layout: { title: 'Structure', components: ['Flex', 'Columns', 'Spacer'], defaultExpanded: true },
   },
   root: {
     fields: {
@@ -1306,23 +1305,6 @@ export const headerPuckConfig = {
     Flex:         puckConfig.components.Flex,
     Columns:      puckConfig.components.Columns,
     Spacer:       puckConfig.components.Spacer,
-    HeaderRow: {
-      label: 'Header Row',
-      fields: {
-        gap: {
-          type: 'select' as const,
-          label: 'Gap',
-          options: [
-            { value: 'none', label: 'None' },
-            { value: 'sm',   label: 'Small (0.5rem)' },
-            { value: 'md',   label: 'Medium (1rem)' },
-            { value: 'lg',   label: 'Large (2rem)' },
-          ],
-        },
-      },
-      defaultProps: { gap: 'lg' },
-      render: HeaderRow,
-    },
   },
 }
 
