@@ -176,6 +176,8 @@ function ConfigPageInner() {
   const [dbResetting, setDbResetting] = useState(false)
   const [dbResetDone, setDbResetDone] = useState(false)
   const [dbResetError, setDbResetError] = useState('')
+  const [dbResetDeleteSetupData, setDbResetDeleteSetupData] = useState(false)
+  const [dbResetWasHard, setDbResetWasHard] = useState(false)
 
   // Media provider state
   const [breakdown, setBreakdown] = useState<Record<string, number>>({})
@@ -282,12 +284,19 @@ function ConfigPageInner() {
     setDbResetting(true)
     setDbResetError('')
     try {
-      const res = await fetch('/api/admin/reset-database', { method: 'POST' })
-      const d = (await res.json()) as { ok?: boolean; error?: string }
+      const res = await fetch('/api/admin/reset-database', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ deleteSetupData: dbResetDeleteSetupData }),
+      })
+      const d = (await res.json()) as { ok?: boolean; error?: string; redirectToSetup?: boolean }
       if (!res.ok) throw new Error(d.error ?? 'Reset failed')
       setShowDbResetConfirm(false)
+      setDbResetWasHard(dbResetDeleteSetupData)
       setDbResetDone(true)
-      setTimeout(() => { window.location.href = '/setup' }, 2000)
+      if (d.redirectToSetup) {
+        setTimeout(() => { window.location.href = '/setup' }, 2000)
+      }
     } catch (err: unknown) {
       setDbResetError(err instanceof Error ? err.message : 'Reset failed')
     } finally {
@@ -556,8 +565,19 @@ function ConfigPageInner() {
               <div className="card" style={{ borderColor: '#dc2626', marginBottom: '1.5rem' }}>
                 <h3 style={{ margin: '0 0 0.5rem', fontSize: '1rem', color: '#dc2626' }}>Are you absolutely sure?</h3>
                 <p style={{ fontSize: '0.875rem', marginBottom: '1rem' }}>
-                  This will <strong>permanently delete all data</strong> from the database. Every user account, page, layout, menu, media record, and all settings will be gone. This cannot be undone.
+                  This will <strong>permanently delete all content</strong> from the database — every page, layout, menu, media record, and other user accounts. This cannot be undone.
                 </p>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginBottom: '1rem', cursor: 'pointer', fontSize: '0.875rem' }}>
+                  <input
+                    type="checkbox"
+                    style={{ marginTop: '0.125rem', flexShrink: 0 }}
+                    checked={dbResetDeleteSetupData}
+                    onChange={(e) => setDbResetDeleteSetupData(e.target.checked)}
+                  />
+                  <span>
+                    <strong>Also delete setup data</strong> — removes your admin account, site name, admin path, and all settings. You will be taken to the setup wizard to start completely from scratch.
+                  </span>
+                </label>
                 {dbResetError && <div className="alert alert-danger" style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>{dbResetError}</div>}
                 <div style={{ display: 'flex', gap: '0.75rem' }}>
                   <button
@@ -570,7 +590,7 @@ function ConfigPageInner() {
                   <button
                     className="btn btn-secondary"
                     disabled={dbResetting}
-                    onClick={() => { setShowDbResetConfirm(false); setDbResetError('') }}
+                    onClick={() => { setShowDbResetConfirm(false); setDbResetError(''); setDbResetDeleteSetupData(false) }}
                   >
                     Cancel
                   </button>
@@ -579,7 +599,9 @@ function ConfigPageInner() {
             )}
             {dbResetDone && (
               <div className="alert alert-info" style={{ marginBottom: '1.5rem' }}>
-                Database reset successfully. Redirecting to setup…
+                {dbResetWasHard
+                  ? 'Database reset successfully. Redirecting to setup…'
+                  : 'All content cleared. Your admin account and site settings have been kept.'}
               </div>
             )}
 
