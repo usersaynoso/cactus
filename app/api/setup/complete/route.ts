@@ -637,7 +637,7 @@ export async function POST() {
   }).catch(() => {})
 
   // Auto-login the admin so the post-setup redirect lands them authenticated
-  const admin = await prisma.user.findFirst({ where: { role: { name: 'admin' } } })
+  const admin = await prisma.user.findFirst({ where: { role: { isProtected: true } } })
   if (admin) {
     const token = await createSession(admin.id)
     await setSessionCookie(token)
