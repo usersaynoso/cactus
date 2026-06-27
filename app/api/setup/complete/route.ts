@@ -318,7 +318,7 @@ const starterBoxedData = {
 }
 
 const starterSidebarRightData = {
-  content: [columns('columns-1', '70/30')],
+  content: [columns('columns-1', { ratio: '70/30' })],
   root: { props: {} },
   zones: {
     'columns-1:left':  [{ type: 'ContentSlot', props: { id: 'content-slot-1' } }],
@@ -327,7 +327,7 @@ const starterSidebarRightData = {
 }
 
 const starterSidebarLeftData = {
-  content: [columns('columns-1', '30/70')],
+  content: [columns('columns-1', { ratio: '30/70' })],
   root: { props: {} },
   zones: {
     'columns-1:left':  [],
