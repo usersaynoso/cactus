@@ -26,6 +26,22 @@ const LAYOUT_TYPES: LayoutTypeOption[] = [
   { key: 'statusPage', label: 'Coming Soon / Maintenance', description: 'Standalone status screen shown before launch or during maintenance.', icon: '⚐' },
 ]
 
+// Inline slot content helper for Group blocks (items stored in props, not zones)
+const g = (id: string, overrides: Record<string, unknown> = {}) => ({
+  type: 'Group',
+  props: { id, direction: 'row', justify: 'between', align: 'center', gap: 'md', padding: 'none', wrap: 'nowrap', ...overrides },
+})
+const logoBlock = (id: string, overrides: Record<string, unknown> = {}) => ({
+  type: 'SiteLogo',
+  props: { id, homeUrl: '/', logoHeight: 40, showTextWithLogo: 'false', showIcon: 'true', textColor: '', ...overrides },
+})
+const menuBlock = (id: string, overrides: Record<string, unknown> = {}) => ({
+  type: 'MenuBlock',
+  props: { id, menuId: '', menuName: '', orientation: 'horizontal', spacing: 'normal', itemFontSize: 'medium', itemFontWeight: 'medium', textTransform: 'none', itemColor: '', showDropdowns: 'hover', showMobileToggle: 'collapse', ...overrides },
+})
+const loginBlock = (id: string) => ({ type: 'LoginButton', props: { id, loginLabel: 'Sign in', registerLabel: 'Register' } })
+const toggleBlock = (id: string) => ({ type: 'ThemeToggle', props: { id } })
+
 const STARTERS_BY_TYPE: Record<string, Starter[]> = {
   header: [
     {
@@ -39,23 +55,130 @@ const STARTERS_BY_TYPE: Record<string, Starter[]> = {
       name: 'Logo Left + Nav Right',
       description: 'Standard header with logo on the left and navigation on the right.',
       builderData: {
-        content: [{ type: 'Row', props: { id: 'cols-1', justify: 'between', align: 'center', gap: 'lg', padding: 'none' } }],
+        content: [g('cols-1', { gap: 'lg', items: [logoBlock('logo-1'), menuBlock('menu-1')] })],
         root: { props: { height: '64px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
-        zones: {
-          'cols-1:items': [{ type: 'SiteLogo', props: { id: 'logo-1' } }, { type: 'MenuBlock', props: { id: 'menu-1' } }],
-        },
+        zones: {},
       },
     },
     {
-      key: 'logo-centred-nav',
-      name: 'Logo + Centred Nav',
-      description: 'Logo on the left with navigation centred across the header.',
+      key: 'logo-nav-login',
+      name: 'Logo Left + Nav + Login',
+      description: 'Logo left, navigation, and login button.',
       builderData: {
-        content: [{ type: 'Row', props: { id: 'cols-1', justify: 'between', align: 'center', gap: 'lg', padding: 'none' } }],
+        content: [g('cols-1', { gap: 'lg', items: [logoBlock('logo-1'), menuBlock('menu-1'), loginBlock('login-1')] })],
         root: { props: { height: '64px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
-        zones: {
-          'cols-1:items': [{ type: 'SiteLogo', props: { id: 'logo-1' } }, { type: 'MenuBlock', props: { id: 'menu-1' } }],
-        },
+        zones: {},
+      },
+    },
+    {
+      key: 'logo-nav-centred',
+      name: 'Logo Left + Nav Centred + Login Right',
+      description: 'Logo left, navigation centred, login button on the right.',
+      builderData: {
+        content: [g('cols-1', { gap: 'lg', items: [logoBlock('logo-1'), menuBlock('menu-1'), loginBlock('login-1')] })],
+        root: { props: { height: '64px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
+        zones: {},
+      },
+    },
+    {
+      key: 'full-width',
+      name: 'Full Width',
+      description: '1400px max-width, no border — good for wide sites.',
+      builderData: {
+        content: [g('cols-1', { gap: 'md', items: [logoBlock('logo-1'), menuBlock('menu-1')] })],
+        root: { props: { height: '64px', sticky: 'yes', borderBottom: 'hide', maxWidth: '1400px' } },
+        zones: {},
+      },
+    },
+    {
+      key: 'logo-name',
+      name: 'Logo + Site Name',
+      description: 'Logo with site name visible next to it, navigation on the right.',
+      builderData: {
+        content: [g('cols-1', { gap: 'md', items: [logoBlock('logo-1', { showTextWithLogo: 'true' }), menuBlock('menu-1')] })],
+        root: { props: { height: '64px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
+        zones: {},
+      },
+    },
+    {
+      key: 'tall',
+      name: 'Tall',
+      description: '80px height — logo left, nav, login and theme toggle right.',
+      builderData: {
+        content: [g('cols-1', { gap: 'lg', items: [
+          logoBlock('logo-1', { logoHeight: 48 }),
+          menuBlock('menu-1', { spacing: 'wide' }),
+          g('actions-row', { justify: 'end', wrap: 'nowrap', gap: 'sm', items: [loginBlock('login-1'), toggleBlock('toggle-1')] }),
+        ] })],
+        root: { props: { height: '80px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
+        zones: {},
+      },
+    },
+    {
+      key: 'minimal',
+      name: 'Minimal',
+      description: 'Logo centred, no navigation, no border.',
+      builderData: {
+        content: [g('cols-1', { justify: 'center', gap: 'md', items: [logoBlock('logo-1')] })],
+        root: { props: { height: '64px', sticky: 'yes', borderBottom: 'hide', maxWidth: '1200px' } },
+        zones: {},
+      },
+    },
+    {
+      key: 'transparent',
+      name: 'Transparent on Scroll',
+      description: 'Transparent background that becomes solid when the user scrolls.',
+      builderData: {
+        content: [g('cols-1', { gap: 'md', items: [logoBlock('logo-1'), menuBlock('menu-1')] })],
+        root: { props: { height: '64px', sticky: 'yes', bgMode: 'transparent-scroll', borderBottom: 'hide', maxWidth: '1200px' } },
+        zones: {},
+      },
+    },
+    {
+      key: 'compact',
+      name: 'Compact',
+      description: '48px height with smaller logo and nav text.',
+      builderData: {
+        content: [g('cols-1', { gap: 'md', items: [logoBlock('logo-1', { logoHeight: 28 }), menuBlock('menu-1', { itemFontSize: 'small' })] })],
+        root: { props: { height: '48px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
+        zones: {},
+      },
+    },
+    {
+      key: 'logo-right',
+      name: 'Logo Right + Nav Left',
+      description: 'Navigation on the left, logo on the right.',
+      builderData: {
+        content: [g('cols-1', { gap: 'lg', items: [menuBlock('menu-1'), logoBlock('logo-1')] })],
+        root: { props: { height: '64px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
+        zones: {},
+      },
+    },
+    {
+      key: 'stacked',
+      name: 'Stacked (Two Row)',
+      description: 'Logo centred on one row, navigation centred below.',
+      builderData: {
+        content: [g('outer', { direction: 'column', justify: 'center', align: 'center', gap: 'sm', items: [
+          g('row-logo', { justify: 'center', items: [logoBlock('logo-1')] }),
+          g('row-nav', { justify: 'center', items: [menuBlock('menu-1')] }),
+        ] })],
+        root: { props: { height: 'auto', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
+        zones: {},
+      },
+    },
+    {
+      key: 'login-toggle',
+      name: 'With Login + Theme Toggle',
+      description: 'Logo left, navigation, login and theme toggle grouped on the right.',
+      builderData: {
+        content: [g('cols-1', { gap: 'lg', items: [
+          logoBlock('logo-1'),
+          menuBlock('menu-1'),
+          g('actions-row', { justify: 'end', wrap: 'nowrap', gap: 'sm', items: [loginBlock('login-1'), toggleBlock('toggle-1')] }),
+        ] })],
+        root: { props: { height: '64px', sticky: 'yes', borderBottom: 'show', maxWidth: '1200px' } },
+        zones: {},
       },
     },
   ],
@@ -89,9 +212,9 @@ const STARTERS_BY_TYPE: Record<string, Starter[]> = {
       name: 'Boxed (centred)',
       description: 'Content centred with a max-width — good for articles.',
       builderData: {
-        content: [{ type: 'Section', props: { id: 'section-1', paddingY: 'md', maxWidth: 'standard', bgType: 'none' } }],
+        content: [{ type: 'Section', props: { id: 'section-1', paddingY: 'md', maxWidth: 'standard', bgType: 'none', content: [{ type: 'ContentSlot', props: { id: 'content-slot-1' } }] } }],
         root: { props: {} },
-        zones: { 'section-1:content': [{ type: 'ContentSlot', props: { id: 'content-slot-1' } }] },
+        zones: {},
       },
     },
     {
