@@ -120,7 +120,7 @@ function GridBlock(props: any) {
   )
 }
 
-function FlexBlock(props: any) {
+function GroupBlock(props: any) {
   const { direction, justify, align, wrap, gap, padding, items } = props
   const justifyMap: Record<string, string> = { start: 'flex-start', center: 'center', end: 'flex-end', between: 'space-between', around: 'space-around', evenly: 'space-evenly' }
   const alignMap: Record<string, string> = { start: 'flex-start', center: 'center', end: 'flex-end', stretch: 'stretch' }
@@ -130,10 +130,9 @@ function FlexBlock(props: any) {
       flexDirection: direction === 'column' ? 'column' : 'row',
       justifyContent: justifyMap[justify] ?? 'flex-start',
       alignItems: alignMap[align] ?? 'stretch',
-      flexWrap: wrap === 'wrap' ? 'wrap' : 'nowrap',
+      flexWrap: wrap === 'nowrap' ? 'nowrap' : 'wrap',
       gap: GAP_MAP[gap] ?? '1rem',
       padding: getPadding(padding),
-      marginBottom: padding === 'none' ? 0 : '1.5rem',
     }}>
       {typeof items === 'function' ? items() : null}
     </div>
@@ -199,28 +198,8 @@ function SplitBlock(props: any) {
   const pair = ratios[ratio] ?? ratios['50/50']!
   return (
     <div style={{ width: '100%', display: 'flex', alignItems, gap: gapValue, flexWrap: 'wrap', marginBottom: padding === 'none' ? 0 : '1.5rem', padding: getPadding(padding) }}>
-      <div style={{ flex: pair[0], minWidth: 200 }}>{puck?.renderDropZone?.({ zone: 'left' })}</div>
-      <div style={{ flex: pair[1], minWidth: 200 }}>{puck?.renderDropZone?.({ zone: 'right' })}</div>
-    </div>
-  )
-}
-
-function RowBlock(props: any) {
-  const { justify = 'between', align = 'center', gap = 'md', padding, items } = props
-  const justifyMap: Record<string, string> = { start: 'flex-start', center: 'center', end: 'flex-end', between: 'space-between', around: 'space-around', evenly: 'space-evenly' }
-  const alignMap: Record<string, string> = { start: 'flex-start', center: 'center', end: 'flex-end', stretch: 'stretch' }
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'row',
-      flexWrap: 'nowrap',
-      justifyContent: justifyMap[justify] ?? 'space-between',
-      alignItems: alignMap[align] ?? 'center',
-      gap: GAP_MAP[gap] ?? '1rem',
-      padding: getPadding(padding),
-      width: '100%',
-    }}>
-      {typeof items === 'function' ? items() : null}
+      <div style={{ flex: pair[0], minWidth: 200 }}>{puck?.renderDropZone?.({ zone: 'left', minEmptyHeight: 80 })}</div>
+      <div style={{ flex: pair[1], minWidth: 200 }}>{puck?.renderDropZone?.({ zone: 'right', minEmptyHeight: 80 })}</div>
     </div>
   )
 }
@@ -817,7 +796,7 @@ function SiteLogoRsc(props: any) {
 
 const puckConfig = {
   categories: {
-    layout:     { title: 'Layout',     components: ['Section', 'Grid', 'Flex', 'Row', 'Split', 'Spacer', 'Divider'], defaultExpanded: true },
+    layout:     { title: 'Layout',     components: ['Section', 'Grid', 'Group', 'Split', 'Spacer', 'Divider'], defaultExpanded: true },
     typography: { title: 'Typography', components: ['Heading', 'TextBlock', 'RichTextBlock', 'Quote'],          defaultExpanded: true },
     actions:    { title: 'Actions',    components: ['ButtonLink', 'CTABanner'],                                 defaultExpanded: true },
     media:      { title: 'Media',      components: ['ImageBlock', 'VideoEmbed', 'Embed'],                       defaultExpanded: true },
@@ -873,31 +852,19 @@ const puckConfig = {
       defaultProps: { columns: '2', gap: 'md', padding: 'none', columnSizes: 'equal', verticalAlign: 'stretch', spaceBelow: 'md', col1Align: 'start', col2Align: 'start', col3Align: 'start', col4Align: 'start' },
       render: GridBlock,
     },
-    Flex: {
-      label: 'Flex',
+    Group: {
+      label: 'Group',
       fields: {
         direction: { type: 'select' as const, label: 'Direction', options: [{ value: 'row', label: 'Row' }, { value: 'column', label: 'Column' }] },
-        justify: { type: 'select' as const, label: 'Justify content', options: [{ value: 'start', label: 'Start' }, { value: 'center', label: 'Center' }, { value: 'end', label: 'End' }, { value: 'between', label: 'Space between' }, { value: 'around', label: 'Space around' }, { value: 'evenly', label: 'Space evenly' }] },
-        align: { type: 'select' as const, label: 'Align items', options: [{ value: 'start', label: 'Start' }, { value: 'center', label: 'Center' }, { value: 'end', label: 'End' }, { value: 'stretch', label: 'Stretch' }] },
+        justify: { type: 'select' as const, label: 'Justify content', options: [{ value: 'start', label: 'Start' }, { value: 'center', label: 'Centre' }, { value: 'end', label: 'End' }, { value: 'between', label: 'Space between' }, { value: 'around', label: 'Space around' }, { value: 'evenly', label: 'Space evenly' }] },
+        align: { type: 'select' as const, label: 'Align items', options: [{ value: 'start', label: 'Start' }, { value: 'center', label: 'Centre' }, { value: 'end', label: 'End' }, { value: 'stretch', label: 'Stretch' }] },
         wrap: { type: 'select' as const, label: 'Wrap', options: [{ value: 'wrap', label: 'Wrap' }, { value: 'nowrap', label: 'No wrap' }] },
         gap: { type: 'select' as const, label: 'Gap', options: [{ value: 'none', label: 'None' }, { value: 'sm', label: 'Small' }, { value: 'md', label: 'Medium' }, { value: 'lg', label: 'Large' }] },
         padding: paddingField,
         items: { type: 'slot' as const },
       },
       defaultProps: { direction: 'row', justify: 'start', align: 'stretch', wrap: 'wrap', gap: 'md', padding: 'none' },
-      render: FlexBlock,
-    },
-    Row: {
-      label: 'Row',
-      fields: {
-        justify: { type: 'select' as const, label: 'Justify', options: [{ value: 'between', label: 'Space between' }, { value: 'start', label: 'Start' }, { value: 'center', label: 'Centre' }, { value: 'end', label: 'End' }, { value: 'around', label: 'Space around' }, { value: 'evenly', label: 'Space evenly' }] },
-        align:   { type: 'select' as const, label: 'Align', options: [{ value: 'center', label: 'Centre' }, { value: 'start', label: 'Top' }, { value: 'end', label: 'Bottom' }, { value: 'stretch', label: 'Stretch' }] },
-        gap:     { type: 'select' as const, label: 'Gap', options: [{ value: 'none', label: 'None' }, { value: 'sm', label: 'Small' }, { value: 'md', label: 'Medium' }, { value: 'lg', label: 'Large' }] },
-        padding: paddingField,
-        items:   { type: 'slot' as const },
-      },
-      defaultProps: { justify: 'between', align: 'center', gap: 'md', padding: 'none' },
-      render: RowBlock,
+      render: GroupBlock,
     },
     Split: {
       label: 'Split',
@@ -1181,7 +1148,7 @@ export const puckRscConfig = { ...puckConfig, components: rscComponents }
 export const footerPuckConfig = {
   categories: {
     site:       { title: 'Site',       components: ['SiteLogo', 'Copyright', 'MenuBlock', 'SocialLinks', 'ButtonLink'], defaultExpanded: true },
-    layout:     { title: 'Layout',     components: ['Grid', 'Flex', 'Row', 'Split', 'Spacer', 'Divider'], defaultExpanded: false },
+    layout:     { title: 'Layout',     components: ['Grid', 'Group', 'Split', 'Spacer', 'Divider'], defaultExpanded: false },
     typography: { title: 'Typography', components: ['Heading', 'TextBlock', 'RichTextBlock'], defaultExpanded: false },
   },
   root: {
@@ -1211,8 +1178,7 @@ export const footerPuckConfig = {
     SocialLinks: puckConfig.components.SocialLinks,
     ButtonLink:  puckConfig.components.ButtonLink,
     Grid:        puckConfig.components.Grid,
-    Flex:        puckConfig.components.Flex,
-    Row:         puckConfig.components.Row,
+    Group:       puckConfig.components.Group,
     Split:       puckConfig.components.Split,
     Spacer:      puckConfig.components.Spacer,
     Divider:     puckConfig.components.Divider,
@@ -1237,7 +1203,7 @@ export const footerPuckRscConfig = {
 
 export const layoutPuckConfig = {
   categories: {
-    layout:     { title: 'Structure',  components: ['ContentSlot', 'Section', 'Grid', 'Flex', 'Row', 'Split', 'Spacer', 'Divider'], defaultExpanded: true },
+    layout:     { title: 'Structure',  components: ['ContentSlot', 'Section', 'Grid', 'Group', 'Split', 'Spacer', 'Divider'], defaultExpanded: true },
     typography: { title: 'Typography', components: ['Heading', 'TextBlock', 'RichTextBlock'], defaultExpanded: false },
   },
   root: {
@@ -1252,8 +1218,7 @@ export const layoutPuckConfig = {
     },
     Section:      puckConfig.components.Section,
     Grid:         puckConfig.components.Grid,
-    Flex:         puckConfig.components.Flex,
-    Row:          puckConfig.components.Row,
+    Group:        puckConfig.components.Group,
     Split:        puckConfig.components.Split,
     Spacer:       puckConfig.components.Spacer,
     Divider:      puckConfig.components.Divider,
@@ -1305,7 +1270,7 @@ const headerRootRender = ({ children, bgMode = 'color', bgColor = '', height = '
 export const headerPuckConfig = {
   categories: {
     site:   { title: 'Site',      components: ['SiteLogo', 'MenuBlock', 'LoginButton', 'ThemeToggle'], defaultExpanded: true },
-    layout: { title: 'Structure', components: ['Grid', 'Flex', 'Row', 'Spacer'], defaultExpanded: true },
+    layout: { title: 'Structure', components: ['Grid', 'Group', 'Spacer'], defaultExpanded: true },
   },
   root: {
     fields: {
@@ -1326,8 +1291,7 @@ export const headerPuckConfig = {
     LoginButton:  puckConfig.components.LoginButton,
     ThemeToggle:  puckConfig.components.ThemeToggle,
     Grid:         puckConfig.components.Grid,
-    Flex:         puckConfig.components.Flex,
-    Row:          puckConfig.components.Row,
+    Group:        puckConfig.components.Group,
     Spacer:       puckConfig.components.Spacer,
   },
 }
