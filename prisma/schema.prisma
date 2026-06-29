@@ -181,8 +181,6 @@ model SiteConfig {
   homepageId             String?
   // Design tokens: colours, fonts, spacing, radius, shadows stored as JSON
   designTokens           Json?
-  // Fallback recipient for module notification emails (e.g. contact form submissions)
-  adminEmail             String?
   createdAt              DateTime   @default(now())
   updatedAt              DateTime   @updatedAt
 }
@@ -367,6 +365,28 @@ model DeployLock {
   lockedAt DateTime @default(now())
   // moduleId or themeId holding the lock
   lockedBy String
+}
+
+// ---------------------------------------------------------------------------
+// GitHub App Connection (singleton — one App per installation)
+// ---------------------------------------------------------------------------
+// Secrets are encrypted at rest using ENCRYPTION_KEY (AES-256-GCM).
+// This is a deliberate exception to the "secrets stay in env vars" rule:
+// the App's private key is generated at runtime during the connect flow
+// and cannot be pasted into an env var ahead of time.
+
+model GithubAppConnection {
+  id                     String   @id @default(cuid())
+  appId                  String
+  appSlug                String
+  installationId         String?
+  installationAccount    String?
+  privateKeyEncrypted    String   @db.Text
+  webhookSecretEncrypted String   @db.Text
+  clientIdEncrypted      String?  @db.Text
+  clientSecretEncrypted  String?  @db.Text
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------------

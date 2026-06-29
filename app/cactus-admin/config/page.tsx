@@ -18,7 +18,6 @@ type SiteConfig = {
   adminPath: string; status: string; hideFromCrawlers: boolean;
   publicRegistration: boolean; trustDeviceDays: number;
   emailFromName: string; emailFromAddress: string; emailProvider: string;
-  adminEmail: string;
   mediaProvider: MediaProviderType | null;
   privacyPolicyPageId: string; termsPageId: string;
   sessionPurgeAfterDays: number; recoveryPurgeAfterDays: number;
@@ -37,7 +36,7 @@ type EnvSection = {
   id: string
   label: string
   description: string
-  keys: Array<{ key: string; label: string; type?: 'text' | 'password'; placeholder?: string; hint?: string }>
+  keys: Array<{ key: string; label: string; type?: 'text' | 'password'; placeholder?: string; hint?: React.ReactNode }>
 }
 
 const EMAIL_BREVO_SECTION: EnvSection = {
@@ -45,7 +44,7 @@ const EMAIL_BREVO_SECTION: EnvSection = {
   label: 'Brevo',
   description: 'Transactional email via Brevo API',
   keys: [
-    { key: 'BREVO_API_KEY', label: 'BREVO_API_KEY', type: 'password', placeholder: 'xkeysib-…', hint: 'Create at brevo.com → Settings → API Keys' },
+    { key: 'BREVO_API_KEY', label: 'BREVO_API_KEY', type: 'password', placeholder: 'xkeysib-…', hint: <a href="https://app.brevo.com/settings/keys/api" target="_blank" rel="noopener noreferrer">Create at brevo.com → Settings → API Keys</a> },
   ],
 }
 
@@ -77,9 +76,9 @@ type MigrationJob = {
 
 const INTEGRATION_SECTIONS: EnvSection[] = [
   {
-    id: 'github',
-    label: 'GitHub API',
-    description: 'Required for installing and updating modules and themes',
+    id: 'github-pat',
+    label: 'GitHub - legacy personal access token (fallback)',
+    description: 'Still works if you prefer a PAT. Prefer connecting a GitHub App above.',
     keys: [
       { key: 'GITHUB_API_TOKEN', label: 'GITHUB_API_TOKEN', type: 'password', placeholder: 'ghp_…', hint: 'GitHub → Settings → Developer settings → Personal access tokens' },
     ],
@@ -176,6 +175,27 @@ function ConfigPageInner() {
   const [dbResetError, setDbResetError] = useState('')
   const [dbResetDeleteSetupData, setDbResetDeleteSetupData] = useState(false)
   const [dbResetWasHard, setDbResetWasHard] = useState(false)
+
+  // GitHub App state
+  type GhStatus = { encryptionKeySet: boolean; connected: boolean; appSlug: string | null; installationAccount: string | null; hasInstallation: boolean; hasPat: boolean }
+  const [ghStatus, setGhStatus] = useState<GhStatus | null>(null)
+  const [ghBusy, setGhBusy] = useState(false)
+  const [ghError, setGhError] = useState('')
+
+  const loadGhStatus = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/github-app')
+      if (res.ok) setGhStatus(await res.json())
+    } catch { /* ignore */ }
+  }, [])
+
+  useEffect(() => {
+    if (tab === 'integrations' && !loading) loadGhStatus()
+  }, [tab, loading, loadGhStatus])
+
+  useEffect(() => {
+    if (searchParams.get('github') === 'installed') loadGhStatus()
+  }, [searchParams, loadGhStatus])
 
   // Media provider state
   const [breakdown, setBreakdown] = useState<Record<string, number>>({})
@@ -430,6 +450,125 @@ function ConfigPageInner() {
   }
 
   const isEnvSectionSet = (keys: string[]) => keys.some((k) => envStatus[k])
+
+  function GitHubAppCard() {
+    const adminPath = config.adminPath ?? ''
+
+    async function handleConnect() {
+      setGhBusy(true)
+      setGhError('')
+      try {
+        const res = await fetch(`/${adminPath}/integrations/github/start`)
+        if (!res.ok) { setGhError('Failed to start GitHub App flow'); setGhBusy(false); return }
+        const { formActionUrl, manifest, state } = await res.json() as { formActionUrl: string; manifest: unknown; state: string }
+        const form = document.createElement('form')
+        form.method = 'post'
+        form.action = `${formActionUrl}?state=${encodeURIComponent(state)}`
+        const input = document.createElement('input')
+        input.type = 'hidden'
+        input.name = 'manifest'
+        input.value = JSON.stringify(manifest)
+        form.appendChild(input)
+        document.body.appendChild(form)
+        form.submit()
+      } catch {
+        setGhError('Failed to start GitHub App flow')
+        setGhBusy(false)
+      }
+    }
+
+    async function handleInstall() {
+      setGhBusy(true)
+      setGhError('')
+      try {
+        const res = await fetch(`/${adminPath}/integrations/github/install`)
+        if (!res.ok) { setGhError('Failed to get install URL'); setGhBusy(false); return }
+        const { installUrl } = await res.json() as { installUrl: string }
+        window.location.href = installUrl
+      } catch {
+        setGhError('Failed to get install URL')
+        setGhBusy(false)
+      }
+    }
+
+    async function handleDisconnect() {
+      setGhBusy(true)
+      setGhError('')
+      try {
+        const res = await fetch(`/${adminPath}/integrations/github/disconnect`, { method: 'POST' })
+        if (!res.ok) { setGhError('Failed to disconnect'); setGhBusy(false); return }
+        await loadGhStatus()
+      } catch {
+        setGhError('Failed to disconnect')
+      }
+      setGhBusy(false)
+    }
+
+    const gh = ghStatus
+
+    return (
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+          <div>
+            <h3 style={{ margin: '0 0 0.25rem', fontSize: '1rem' }}>GitHub App</h3>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', margin: 0 }}>Connect a GitHub App for fine-grained, auto-rotating access to your repository</p>
+          </div>
+          <StatusBadge set={!!(gh?.connected && gh.hasInstallation)} />
+        </div>
+
+        {ghError && <div className="alert alert-danger" style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>{ghError}</div>}
+
+        {!gh && (
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Loading…</p>
+        )}
+
+        {gh && !gh.encryptionKeySet && (
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>
+            Set <code>ENCRYPTION_KEY</code> (generate with <code>openssl rand -hex 32</code>) to enable the GitHub App flow.
+          </p>
+        )}
+
+        {gh && gh.encryptionKeySet && !gh.connected && (
+          <div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>No GitHub App connected. Click below to create and install one in about 30 seconds.</p>
+            <button className="btn btn-primary" style={{ fontSize: '0.875rem' }} disabled={ghBusy} onClick={handleConnect}>
+              {ghBusy ? 'Opening GitHub…' : 'Connect a GitHub App'}
+            </button>
+          </div>
+        )}
+
+        {gh && gh.encryptionKeySet && gh.connected && !gh.hasInstallation && (
+          <div>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '0.75rem' }}>
+              App <strong>{gh.appSlug}</strong> created. Now install it on your repository to grant access.
+            </p>
+            <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <button className="btn btn-primary" style={{ fontSize: '0.875rem' }} disabled={ghBusy} onClick={handleInstall}>
+                {ghBusy ? 'Opening GitHub…' : 'Install app on repository'}
+              </button>
+              <button className="btn btn-secondary" style={{ fontSize: '0.875rem' }} disabled={ghBusy} onClick={handleDisconnect}>
+                Start over
+              </button>
+            </div>
+          </div>
+        )}
+
+        {gh && gh.encryptionKeySet && gh.connected && gh.hasInstallation && (
+          <div>
+            <p style={{ fontSize: 'var(--text-sm)', marginBottom: '0.75rem' }}>
+              Connected as <strong>{gh.appSlug}</strong>, installed on <strong>{gh.installationAccount ?? 'your account'}</strong>.
+            </p>
+            <button className="btn btn-danger" style={{ fontSize: '0.875rem' }} disabled={ghBusy} onClick={handleDisconnect}>
+              {ghBusy ? 'Disconnecting…' : 'Disconnect'}
+            </button>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginTop: '0.5rem', marginBottom: 0 }}>
+              Disconnecting removes the credentials from this database. The GitHub App itself remains on your GitHub account.
+            </p>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   function EnvSectionCard({ section }: { section: EnvSection }) {
     const allKeys = section.keys.map((f) => f.key)
@@ -733,11 +872,6 @@ function ConfigPageInner() {
         <div>
           <div className="field"><label>From name</label><input value={config.emailFromName ?? ''} onChange={(e) => set('emailFromName', e.target.value)} /></div>
           <div className="field"><label>From address</label><input type="email" value={config.emailFromAddress ?? ''} onChange={(e) => set('emailFromAddress', e.target.value)} /></div>
-          <div className="field">
-            <label>Admin notification email</label>
-            <input type="email" value={config.adminEmail ?? ''} onChange={(e) => set('adminEmail', e.target.value)} placeholder="e.g. hello@yoursite.com" />
-            <span className="field-hint">Used as the fallback recipient for contact form submissions when no override is configured in the module settings.</span>
-          </div>
 
           <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '1.5rem 0' }} />
           <div style={{ marginBottom: '1rem' }}>
@@ -1015,6 +1149,7 @@ function ConfigPageInner() {
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
             All credentials are stored directly in your Vercel project environment variables. Changes take effect on next deployment.
           </p>
+          <GitHubAppCard />
           {INTEGRATION_SECTIONS.map((section) => (
             <EnvSectionCard key={section.id} section={section} />
           ))}
