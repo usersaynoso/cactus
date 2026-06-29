@@ -115,6 +115,7 @@ export default function SetupPage() {
   const [dbReady, setDbReady] = useState(false)
   const [usingExistingData, setUsingExistingData] = useState(false)
   const [adminAlreadyExists, setAdminAlreadyExists] = useState(false)
+  const [finalisingDeploy, setFinalisingDeploy] = useState<string | null>(null)
   const cancelPollingRef = useRef<(() => void) | null>(null)
   const cancelDeployLogPollRef = useRef<(() => void) | null>(null)
   // Counter to force re-run the env-check useEffect even when step is already 'env'
@@ -606,8 +607,18 @@ export default function SetupPage() {
     try {
       const res = await fetch('/api/setup/complete', { method: 'POST' })
       if (!res.ok) throw new Error('Failed to complete setup')
-      const { adminPath: ap } = await res.json()
-      window.location.href = `/${ap}`
+      const data = (await res.json()) as { adminPath: string; needsRedeploy?: boolean }
+      if (data.needsRedeploy) {
+        // SESSION_SECRET was just written to Vercel — wait for the redeploy that
+        // picks it up, then send the user to the login page.
+        setFinalisingDeploy(data.adminPath)
+        setLoading(false)
+        cancelPollingRef.current = startHealthPolling(() => {
+          window.location.href = `/${data.adminPath}/login`
+        })
+      } else {
+        window.location.href = `/${data.adminPath}`
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Something went wrong')
       setLoading(false)
@@ -668,6 +679,20 @@ export default function SetupPage() {
       </div>
 
       {error && <div className="alert alert-danger" style={{ marginBottom: '1rem' }}>{error}</div>}
+
+      {finalisingDeploy ? (
+        <div style={{ textAlign: 'center', padding: '2rem 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+            <span className="setup-spinner" style={{ width: 28, height: 28 }} />
+          </div>
+          <p style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: '1.0625rem' }}>Almost there!</p>
+          <p style={{ color: 'var(--color-muted)', fontSize: '0.9375rem', margin: 0 }}>
+            Vercel is applying the final configuration. You&apos;ll be redirected to
+            your login page automatically once the deployment is ready.
+          </p>
+        </div>
+      ) : (
+      <>
 
       {/* ── Step: CONNECT ── */}
       {step === 'connect' && (
@@ -915,6 +940,9 @@ export default function SetupPage() {
                 : 'Set passkey →'}
           </button>
         </div>
+      )}
+
+      </>
       )}
 
       <div style={{ textAlign: 'center', fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: '2rem', paddingTop: '1rem', borderTop: '1px solid var(--color-border)' }}>

@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
+import { randomBytes } from 'crypto'
 import { prisma } from '@/lib/db/prisma'
 import { syncToEdgeConfig } from '@/lib/config/edge-config'
 import { getSessionFromCookie, createSession, setSessionCookie } from '@/lib/auth/session'
 import { refreshStarterLayouts } from '@/lib/setup/starterLayouts'
+import { upsertVercelEnvVar } from '@/lib/vercel/env'
+import { triggerVercelRedeploy } from '@/lib/vercel/deploy'
 
 export async function POST() {
   const cfg = await prisma.siteConfig.findUnique({
@@ -90,6 +93,22 @@ export async function POST() {
     adminPath: cfg.adminPath,
     siteStatus: 'comingSoon',
   }).catch(() => {})
+
+  // SESSION_SECRET is generated during the Vercel connect step, but that step is
+  // skipped when VERCEL_API_TOKEN is already in the environment before setup.
+  // If it's missing, generate it now, write it to Vercel, and trigger a redeploy
+  // so the new deployment picks it up. Auto-login is skipped because the current
+  // process won't see the new env var until redeployed.
+  if (!process.env.SESSION_SECRET) {
+    const vercelToken = process.env.VERCEL_API_TOKEN
+    const projectId = process.env.VERCEL_PROJECT_ID
+    if (vercelToken && projectId) {
+      const secret = randomBytes(48).toString('hex')
+      await upsertVercelEnvVar(vercelToken, projectId, 'SESSION_SECRET', secret).catch(() => {})
+      await triggerVercelRedeploy(vercelToken, projectId).catch(() => {})
+    }
+    return NextResponse.json({ adminPath: cfg.adminPath, needsRedeploy: true })
+  }
 
   // Auto-login the admin so the post-setup redirect lands them authenticated
   const admin = await prisma.user.findFirst({ where: { role: { isProtected: true } } })
