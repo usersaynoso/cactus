@@ -46,7 +46,6 @@ const Patch = z.object({
   recoveryPurgeAfterDays: z.number().int().min(1).max(30).optional(),
   mainMenuId: z.string().optional().nullable(),
   homepageId: z.string().optional().nullable(),
-  adminEmail: z.string().email().optional().nullable(),
 })
 
 export async function PATCH(request: NextRequest) {

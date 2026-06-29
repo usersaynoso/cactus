@@ -143,7 +143,6 @@ CREATE TABLE "SiteConfig" (
     "mainMenuId" TEXT,
     "homepageId" TEXT,
     "designTokens" JSONB,
-    "adminEmail" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     CONSTRAINT "SiteConfig_pkey" PRIMARY KEY ("id")
@@ -388,3 +387,22 @@ ALTER TABLE "Media" ADD CONSTRAINT "Media_uploadedById_fkey" FOREIGN KEY ("uploa
 ALTER TABLE "MenuItem" ADD CONSTRAINT "MenuItem_menuId_fkey" FOREIGN KEY ("menuId") REFERENCES "Menu"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "MenuItem" ADD CONSTRAINT "MenuItem_parentId_fkey" FOREIGN KEY ("parentId") REFERENCES "MenuItem"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "MenuItem" ADD CONSTRAINT "MenuItem_pageId_fkey" FOREIGN KEY ("pageId") REFERENCES "InfoPage"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- ---------------------------------------------------------------------------
+-- GitHub App Connection
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE "GithubAppConnection" (
+    "id" TEXT NOT NULL,
+    "appId" TEXT NOT NULL,
+    "appSlug" TEXT NOT NULL,
+    "installationId" TEXT,
+    "installationAccount" TEXT,
+    "privateKeyEncrypted" TEXT NOT NULL,
+    "webhookSecretEncrypted" TEXT NOT NULL,
+    "clientIdEncrypted" TEXT,
+    "clientSecretEncrypted" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+    CONSTRAINT "GithubAppConnection_pkey" PRIMARY KEY ("id")
+);
