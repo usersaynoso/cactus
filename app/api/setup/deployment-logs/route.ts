@@ -42,10 +42,7 @@ export async function GET(req: NextRequest) {
         payload?: { text?: string }
         created?: number
       }>
-      const filtered = events.filter((e) =>
-        (e.type === 'stdout' || e.type === 'stderr' || e.type === 'command') &&
-        !!e.payload?.text
-      )
+      const filtered = events.filter((e) => !!e.payload?.text)
       logLines = filtered.map((e) => e.payload!.text!).slice(-3)
       const lastEvent = events[events.length - 1]
       if (lastEvent?.created) latestTimestamp = lastEvent.created

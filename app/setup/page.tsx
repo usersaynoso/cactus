@@ -123,7 +123,6 @@ export default function SetupPage() {
 
   // Deployment progress
   const [deploymentId, setDeploymentId] = useState<string | null>(null)
-  const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [deployLogs, setDeployLogs] = useState<string[]>([])
   const [deployState, setDeployState] = useState('')
 
@@ -241,7 +240,7 @@ export default function SetupPage() {
           const data = (await res.json()) as { state?: string; logLines?: string[]; latestTimestamp?: number | null }
           if (!cancelled) {
             if (data.state) setDeployState(data.state)
-            if (data.logLines) setDeployLogs(data.logLines)
+            if (data.logLines && data.logLines.length > 0) setDeployLogs(data.logLines)
             if (data.latestTimestamp) lastSeen = data.latestTimestamp
           }
         }
@@ -257,14 +256,6 @@ export default function SetupPage() {
       clearTimeout(timer)
     }
   }
-
-  // Elapsed-seconds timer — resets and starts whenever we enter db-redeploying.
-  useEffect(() => {
-    if (dbSubStep !== 'db-redeploying') return
-    setElapsedSeconds(0)
-    const interval = setInterval(() => setElapsedSeconds((s) => s + 1), 1_000)
-    return () => clearInterval(interval)
-  }, [dbSubStep])
 
   // Auto-advance from Step 2 once the health check passes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -834,7 +825,6 @@ export default function SetupPage() {
 
           {dbSubStep === 'db-redeploying' && (
             <DbRedeployingPanel
-              elapsedSeconds={elapsedSeconds}
               deployState={deployState}
               deployLogs={deployLogs}
               deploymentId={deploymentId}
@@ -1423,20 +1413,14 @@ function DbManualPanel({
 }
 
 function DbRedeployingPanel({
-  elapsedSeconds,
   deployState,
   deployLogs,
   deploymentId,
 }: {
-  elapsedSeconds: number
   deployState: string
   deployLogs: string[]
   deploymentId: string | null
 }) {
-  const minutes = Math.floor(elapsedSeconds / 60)
-  const seconds = elapsedSeconds % 60
-  const timerText = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`
-
   const stateLabel =
     deployState === 'BUILDING' ? 'Building…' :
     deployState === 'READY' ? 'Done' :
@@ -1460,7 +1444,6 @@ function DbRedeployingPanel({
             <>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: deployLogs.length > 0 ? '0.5rem' : 0 }}>
                 <strong>Redeploying…</strong>
-                <span style={{ fontSize: '0.8125rem', color: 'var(--color-muted)' }}>{timerText}</span>
                 {stateLabel && (
                   <span style={{ fontSize: '0.75rem', padding: '0.125rem 0.5rem', borderRadius: 99, background: 'var(--color-bg)', border: '1px solid var(--color-border)' }}>
                     {stateLabel}
