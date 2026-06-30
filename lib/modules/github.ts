@@ -1,13 +1,10 @@
-// GitHub Git Data API integration for module/theme install and update.
+// GitHub Git Data API integration for module install, update, and removal.
 // Uses @octokit/rest — never shells out to git CLI.
-// Installs/updates work by committing a submodule reference (gitlink, mode 160000)
-// plus the .gitmodules entry via createTree + createCommit + updateRef.
+// Module registry is stored in modules.json at the repo root (plain JSON, no git submodule machinery).
 
 import { parseGitHubRepo } from './manifest'
 import { getGithubClient } from '@/lib/github/client'
 
-// Parse the MAIN repo (where submodules are committed) from GITHUB_REPO env var.
-// Format: "owner/repo"
 function getMainRepo(): { owner: string; repo: string } {
   const raw = process.env.GITHUB_REPO ?? ''
   const [owner, repo] = raw.split('/')
@@ -17,8 +14,6 @@ function getMainRepo(): { owner: string; repo: string } {
   return { owner, repo }
 }
 
-// Fetch the latest tagged release SHA for a repo.
-// Returns { tag, sha } or null if no releases.
 export async function getLatestRelease(
   repoUrl: string
 ): Promise<{ tag: string; sha: string; body: string | null } | null> {
@@ -27,14 +22,12 @@ export async function getLatestRelease(
 
   try {
     const { data } = await octokit.rest.repos.getLatestRelease({ owner, repo })
-    // Get the commit SHA for the tag
     const tagRef = await octokit.rest.git.getRef({
       owner,
       repo,
       ref: `tags/${data.tag_name}`,
     })
     const tagSha = tagRef.data.object.sha
-    // If tag is an annotated tag object, dereference it
     let commitSha = tagSha
     if (tagRef.data.object.type === 'tag') {
       const tag = await octokit.rest.git.getTag({ owner, repo, tag_sha: tagSha })
@@ -47,189 +40,53 @@ export async function getLatestRelease(
   }
 }
 
-// Commit a new submodule to the main repo using the Git Data API.
-// This is how an "install" works:
-//   1. Get the current HEAD commit and tree.
-//   2. Create a new tree that adds the gitlink (mode 160000) and .gitmodules entry.
-//   3. Create a new commit.
-//   4. Update the branch ref.
-export async function commitSubmoduleAdd(params: {
-  submodulePath: string  // e.g. "modules/my-forum"
-  submoduleUrl: string   // e.g. "https://github.com/user/my-forum"
-  commitSha: string      // the commit SHA to pin the submodule to
-  message: string
-}): Promise<{ commitSha: string }> {
-  const octokit = await getGithubClient()
-  const { owner, repo } = getMainRepo()
+interface ModuleEntry {
+  name: string
+  repoUrl: string
+  version: string
+}
 
-  // Get current HEAD
-  const { data: ref } = await octokit.rest.git.getRef({
-    owner, repo, ref: 'heads/main',
-  })
-  const headSha = ref.object.sha
+interface ModulesJson {
+  modules: ModuleEntry[]
+}
 
-  const { data: headCommit } = await octokit.rest.git.getCommit({
-    owner, repo, commit_sha: headSha,
-  })
-  const baseTreeSha = headCommit.tree.sha
-
-  // Read current .gitmodules (if any)
-  let currentGitmodules = ''
+async function readModulesJson(
+  octokit: Awaited<ReturnType<typeof getGithubClient>>,
+  owner: string,
+  repo: string
+): Promise<{ content: ModulesJson; fileSha: string | null }> {
   try {
-    const { data: fileData } = await octokit.rest.repos.getContent({
-      owner, repo, path: '.gitmodules',
-    })
-    if ('content' in fileData) {
-      currentGitmodules = Buffer.from(fileData.content, 'base64').toString('utf8')
+    const { data } = await octokit.rest.repos.getContent({ owner, repo, path: 'modules.json' })
+    if ('content' in data) {
+      const parsed = JSON.parse(Buffer.from(data.content, 'base64').toString('utf8')) as ModulesJson
+      return { content: parsed, fileSha: data.sha }
     }
   } catch {
-    // .gitmodules doesn't exist yet — start fresh
+    // File doesn't exist yet
   }
+  return { content: { modules: [] }, fileSha: null }
+}
 
-  const newEntry = [
-    `[submodule "${params.submodulePath}"]`,
-    `\tpath = ${params.submodulePath}`,
-    `\turl = ${params.submoduleUrl}`,
-  ].join('\n')
+async function commitModulesJson(
+  octokit: Awaited<ReturnType<typeof getGithubClient>>,
+  owner: string,
+  repo: string,
+  updated: ModulesJson,
+  message: string,
+  deleteGitmodules = false
+): Promise<{ commitSha: string }> {
+  const { data: ref } = await octokit.rest.git.getRef({ owner, repo, ref: 'heads/main' })
+  const headSha = ref.object.sha
 
-  const updatedGitmodules = currentGitmodules.trimEnd()
-    ? `${currentGitmodules.trimEnd()}\n\n${newEntry}\n`
-    : `${newEntry}\n`
+  const { data: headCommit } = await octokit.rest.git.getCommit({ owner, repo, commit_sha: headSha })
+  const baseTreeSha = headCommit.tree.sha
 
-  // Create blob for .gitmodules
+  const jsonContent = JSON.stringify(updated, null, 2) + '\n'
   const { data: blob } = await octokit.rest.git.createBlob({
     owner, repo,
-    content: Buffer.from(updatedGitmodules).toString('base64'),
+    content: Buffer.from(jsonContent).toString('base64'),
     encoding: 'base64',
   })
-
-  // Create tree with gitlink + updated .gitmodules
-  const { data: newTree } = await octokit.rest.git.createTree({
-    owner, repo,
-    base_tree: baseTreeSha,
-    tree: [
-      {
-        path: params.submodulePath,
-        mode: '160000', // gitlink
-        type: 'commit',
-        sha: params.commitSha,
-      },
-      {
-        path: '.gitmodules',
-        mode: '100644',
-        type: 'blob',
-        sha: blob.sha,
-      },
-    ],
-  })
-
-  // Create commit
-  const { data: newCommit } = await octokit.rest.git.createCommit({
-    owner, repo,
-    message: params.message,
-    tree: newTree.sha,
-    parents: [headSha],
-  })
-
-  // Update branch ref
-  await octokit.rest.git.updateRef({
-    owner, repo,
-    ref: 'heads/main',
-    sha: newCommit.sha,
-  })
-
-  return { commitSha: newCommit.sha }
-}
-
-// Update an existing submodule to a new commit SHA.
-export async function commitSubmoduleUpdate(params: {
-  submodulePath: string
-  commitSha: string
-  message: string
-}): Promise<{ commitSha: string }> {
-  const octokit = await getGithubClient()
-  const { owner, repo } = getMainRepo()
-
-  const { data: ref } = await octokit.rest.git.getRef({
-    owner, repo, ref: 'heads/main',
-  })
-  const headSha = ref.object.sha
-  const { data: headCommit } = await octokit.rest.git.getCommit({
-    owner, repo, commit_sha: headSha,
-  })
-
-  const { data: newTree } = await octokit.rest.git.createTree({
-    owner, repo,
-    base_tree: headCommit.tree.sha,
-    tree: [
-      {
-        path: params.submodulePath,
-        mode: '160000',
-        type: 'commit',
-        sha: params.commitSha,
-      },
-    ],
-  })
-
-  const { data: newCommit } = await octokit.rest.git.createCommit({
-    owner, repo,
-    message: params.message,
-    tree: newTree.sha,
-    parents: [headSha],
-  })
-
-  await octokit.rest.git.updateRef({
-    owner, repo,
-    ref: 'heads/main',
-    sha: newCommit.sha,
-  })
-
-  return { commitSha: newCommit.sha }
-}
-
-// Remove an existing submodule from the main repo.
-// Deletes the gitlink entry and rewrites .gitmodules without the removed entry.
-export async function commitSubmoduleRemove(params: {
-  submodulePath: string
-  message: string
-}): Promise<void> {
-  const octokit = await getGithubClient()
-  const { owner, repo } = getMainRepo()
-
-  const { data: ref } = await octokit.rest.git.getRef({
-    owner, repo, ref: 'heads/main',
-  })
-  const headSha = ref.object.sha
-
-  const { data: headCommit } = await octokit.rest.git.getCommit({
-    owner, repo, commit_sha: headSha,
-  })
-  const baseTreeSha = headCommit.tree.sha
-
-  // Read current .gitmodules and strip the entry for this submodule
-  let updatedGitmodules = ''
-  try {
-    const { data: fileData } = await octokit.rest.repos.getContent({
-      owner, repo, path: '.gitmodules',
-    })
-    if ('content' in fileData) {
-      const current = Buffer.from(fileData.content, 'base64').toString('utf8')
-      // Remove the block for this submodule (from [submodule "path"] to the next blank line or EOF)
-      updatedGitmodules = current
-        .replace(
-          new RegExp(
-            `\\[submodule "${params.submodulePath}"\\][^\\[]*`,
-            'g'
-          ),
-          ''
-        )
-        .replace(/\n{3,}/g, '\n\n')
-        .trim()
-      if (updatedGitmodules) updatedGitmodules += '\n'
-    }
-  } catch {
-    // .gitmodules missing — nothing to rewrite
-  }
 
   const treeItems: Array<{
     path: string
@@ -237,19 +94,10 @@ export async function commitSubmoduleRemove(params: {
     type: 'blob' | 'tree' | 'commit'
     sha: string | null
   }> = [
-    // Deleting a gitlink: set sha to null
-    { path: params.submodulePath, mode: '160000', type: 'commit', sha: null },
+    { path: 'modules.json', mode: '100644', type: 'blob', sha: blob.sha },
   ]
 
-  if (updatedGitmodules) {
-    const { data: blob } = await octokit.rest.git.createBlob({
-      owner, repo,
-      content: Buffer.from(updatedGitmodules).toString('base64'),
-      encoding: 'base64',
-    })
-    treeItems.push({ path: '.gitmodules', mode: '100644', type: 'blob', sha: blob.sha })
-  } else {
-    // No entries left — delete .gitmodules entirely
+  if (deleteGitmodules) {
     treeItems.push({ path: '.gitmodules', mode: '100644', type: 'blob', sha: null })
   }
 
@@ -261,20 +109,74 @@ export async function commitSubmoduleRemove(params: {
 
   const { data: newCommit } = await octokit.rest.git.createCommit({
     owner, repo,
-    message: params.message,
+    message,
     tree: newTree.sha,
     parents: [headSha],
   })
 
-  await octokit.rest.git.updateRef({
-    owner, repo,
-    ref: 'heads/main',
-    sha: newCommit.sha,
-  })
+  await octokit.rest.git.updateRef({ owner, repo, ref: 'heads/main', sha: newCommit.sha })
+
+  return { commitSha: newCommit.sha }
 }
 
-// Check the Vercel deployments API to see if the latest deployment succeeded.
-// Used as a fallback when webhooks aren't configured (Hobby plan).
+async function hasGitmodules(
+  octokit: Awaited<ReturnType<typeof getGithubClient>>,
+  owner: string,
+  repo: string
+): Promise<boolean> {
+  try {
+    await octokit.rest.repos.getContent({ owner, repo, path: '.gitmodules' })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export async function commitModuleAdd(params: {
+  name: string
+  repoUrl: string
+  version: string
+  message: string
+}): Promise<{ commitSha: string }> {
+  const octokit = await getGithubClient()
+  const { owner, repo } = getMainRepo()
+
+  const { content } = await readModulesJson(octokit, owner, repo)
+  content.modules.push({ name: params.name, repoUrl: params.repoUrl, version: params.version })
+
+  const deleteGitmodules = await hasGitmodules(octokit, owner, repo)
+  return commitModulesJson(octokit, owner, repo, content, params.message, deleteGitmodules)
+}
+
+export async function commitModuleUpdate(params: {
+  name: string
+  version: string
+  message: string
+}): Promise<{ commitSha: string }> {
+  const octokit = await getGithubClient()
+  const { owner, repo } = getMainRepo()
+
+  const { content } = await readModulesJson(octokit, owner, repo)
+  const entry = content.modules.find(m => m.name === params.name)
+  if (!entry) throw new Error(`Module "${params.name}" not found in modules.json`)
+  entry.version = params.version
+
+  return commitModulesJson(octokit, owner, repo, content, params.message)
+}
+
+export async function commitModuleRemove(params: {
+  name: string
+  message: string
+}): Promise<void> {
+  const octokit = await getGithubClient()
+  const { owner, repo } = getMainRepo()
+
+  const { content } = await readModulesJson(octokit, owner, repo)
+  content.modules = content.modules.filter(m => m.name !== params.name)
+
+  await commitModulesJson(octokit, owner, repo, content, params.message)
+}
+
 export async function getLatestDeploymentStatus(): Promise<
   'READY' | 'ERROR' | 'BUILDING' | 'UNKNOWN'
 > {

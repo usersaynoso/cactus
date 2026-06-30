@@ -10,7 +10,7 @@ import {
   parseGitHubRepo,
   validateTablePrefixUnique,
 } from '@/lib/modules/manifest'
-import { commitSubmoduleAdd, getLatestRelease } from '@/lib/modules/github'
+import { commitModuleAdd, getLatestRelease } from '@/lib/modules/github'
 import { getGitHubConfigStatus } from '@/lib/config/env'
 import { recordDeploymentNeeded } from '@/lib/notifications/deployment'
 
@@ -100,8 +100,6 @@ export async function POST(request: NextRequest) {
 
   // Acquire deploy lock and create the module row
   const { owner, repo } = parseGitHubRepo(repoUrl)
-  const submodulePath = `modules/${manifest.name}`
-
   await prisma.$transaction([
     prisma.deployLock.create({
       data: { id: 'singleton', lockedBy: `module:${manifest.name}` },
@@ -130,11 +128,11 @@ export async function POST(request: NextRequest) {
       )
     )
 
-    // Commit submodule via GitHub API
-    await commitSubmoduleAdd({
-      submodulePath,
-      submoduleUrl: repoUrl,
-      commitSha: release.sha,
+    // Register module in modules.json via GitHub API
+    await commitModuleAdd({
+      name: manifest.name,
+      repoUrl,
+      version: release.tag,
       message: `chore: install module ${manifest.name} v${release.tag}\n\n[cactus-install]`,
     })
 

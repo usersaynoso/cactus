@@ -4,7 +4,7 @@ import { prisma } from '@/lib/db/prisma'
 import { getSessionFromCookie } from '@/lib/auth/session'
 import { hasPermission } from '@/lib/permissions/check'
 import { errorResponse } from '@/lib/utils'
-import { commitSubmoduleUpdate, commitSubmoduleRemove, getLatestRelease, getLatestDeploymentStatus } from '@/lib/modules/github'
+import { commitModuleUpdate, commitModuleRemove, getLatestRelease, getLatestDeploymentStatus } from '@/lib/modules/github'
 import { getGitHubConfigStatus } from '@/lib/config/env'
 import { recordDeploymentNeeded } from '@/lib/notifications/deployment'
 
@@ -84,9 +84,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     })
 
     try {
-      await commitSubmoduleUpdate({
-        submodulePath: `modules/${mod.name}`,
-        commitSha: release.sha,
+      await commitModuleUpdate({
+        name: mod.name,
+        version: release.tag,
         message: `chore: update module ${mod.name} to v${release.tag}\n\n[cactus-update]`,
       })
 
@@ -133,7 +133,7 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     )
   }
   if (ghConfigStatus === 'not_configured') {
-    return errorResponse('GitHub is not configured. Cannot remove module submodule.', 503)
+    return errorResponse('GitHub is not configured. Cannot remove module from registry.', 503)
   }
 
   const parsed = DeleteBody.safeParse(await request.json())
@@ -163,8 +163,8 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   const droppedTables: string[] = []
 
   try {
-    await commitSubmoduleRemove({
-      submodulePath: `modules/${mod.name}`,
+    await commitModuleRemove({
+      name: mod.name,
       message: `chore: uninstall module ${mod.name}\n\n[cactus-uninstall]`,
     })
 
