@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import AdminNav from './AdminNav'
+import NotificationBell from './NotificationBell'
 import PendingDeployBanner from './PendingDeployBanner'
 import { AdminPathProvider } from './AdminPathContext'
 import type { Role } from '@prisma/client'
@@ -98,6 +99,9 @@ export default function AdminShell({ adminPath, userRole, siteName, version, chi
             className="admin-sidebar-logo-img"
           />
           {!collapsed && <span className="admin-sidebar-logo-text">{siteName}</span>}
+          {!collapsed && (
+            <NotificationBell adminPath={adminPath} unreadCount={unreadCount} />
+          )}
           <button
             className="admin-sidebar-close"
             onClick={() => setMobileOpen(false)}
@@ -107,17 +111,13 @@ export default function AdminShell({ adminPath, userRole, siteName, version, chi
           </button>
         </div>
 
-        <AdminNav
-          adminPath={adminPath}
-          userRole={userRole}
-          version={version}
-          collapsed={collapsed}
-          onNavClick={() => setMobileOpen(false)}
-          moduleNavEntries={moduleNavEntries}
-          unreadCount={unreadCount}
-        />
+        {collapsed && (
+          <div className="admin-sidebar-bell-row">
+            <NotificationBell adminPath={adminPath} unreadCount={unreadCount} collapsed />
+          </div>
+        )}
 
-        {/* Desktop collapse/expand toggle — pinned to the bottom of the sidebar */}
+        {/* Desktop collapse/expand toggle — sits above the nav as a header control */}
         <button
           className="admin-sidebar-toggle"
           onClick={toggleCollapsed}
@@ -127,6 +127,15 @@ export default function AdminShell({ adminPath, userRole, siteName, version, chi
           <span className="admin-sidebar-toggle-icon">{collapsed ? '›' : '‹'}</span>
           {!collapsed && <span className="admin-sidebar-toggle-label">Collapse</span>}
         </button>
+
+        <AdminNav
+          adminPath={adminPath}
+          userRole={userRole}
+          version={version}
+          collapsed={collapsed}
+          onNavClick={() => setMobileOpen(false)}
+          moduleNavEntries={moduleNavEntries}
+        />
       </aside>
 
       <div className="admin-main">

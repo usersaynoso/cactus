@@ -21,7 +21,7 @@ export default function NotificationActions({ id, isRead, canRedeploy }: Props) 
       const res = await fetch(`/api/admin/notifications/${id}/redeploy`, { method: 'POST' })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error ?? 'Redeploy failed')
-      router.refresh()
+      window.location.assign('/cactus-status/redeploying')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Redeploy failed')
     } finally {

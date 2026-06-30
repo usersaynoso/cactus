@@ -57,6 +57,7 @@ export default function ModulesPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
   const [ghStatus, setGhStatus] = useState<GitHubAppStatus | null>(null)
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
   const [releaseNotesFor, setReleaseNotesFor] = useState<string | null>(null)
@@ -78,12 +79,30 @@ export default function ModulesPage() {
         const gh = await ghRes.json()
         setGhStatus({ connected: gh.connected, hasInstallation: gh.hasInstallation, hasPat: gh.hasPat })
       }
-      // Fire update checks for each installed module in parallel; merge results as they arrive
+      // For each installed module: reconcile stale 'deploying' status (Hobby-plan fallback
+      // for when the redeploying screen was closed mid-build), otherwise check for updates.
       const installedModules = modules.filter((m) => m.installed && m.installedId)
       if (installedModules.length > 0) {
         Promise.all(
           installedModules.map(async (m) => {
             try {
+              if (m.status === 'deploying') {
+                const res = await fetch(`/api/admin/modules/${m.installedId}`, {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'check-status' }),
+                })
+                if (!res.ok) return
+                const data = await res.json() as { status?: ModuleStatus }
+                if (data.status && data.status !== 'deploying') {
+                  setEntries((prev) =>
+                    prev.map((e) =>
+                      e.installedId === m.installedId ? { ...e, status: data.status } : e
+                    )
+                  )
+                }
+                return
+              }
               const res = await fetch(`/api/admin/modules/${m.installedId}`)
               if (!res.ok) return
               const data = await res.json() as { updateAvailable?: string | null; notes?: string | null }
@@ -123,6 +142,7 @@ export default function ModulesPage() {
 
   async function handleInstall(repoUrl: string) {
     setError('')
+    setNotice('')
     setLoaderFor(repoUrl, true)
     try {
       const res = await fetch('/api/admin/modules', {
@@ -132,15 +152,19 @@ export default function ModulesPage() {
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error ?? 'Install failed')
-      window.location.assign('/cactus-status/redeploying')
+      setNotice('Module installed. Your changes are waiting to go live - review and redeploy from Notifications.')
+      await loadDirectory()
+      router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Install failed')
+    } finally {
       setLoaderFor(repoUrl, false)
     }
   }
 
   async function handleAction(id: string, action: 'update' | 'enable' | 'disable') {
     setError('')
+    setNotice('')
     setLoaderFor(id, true)
     try {
       const res = await fetch(`/api/admin/modules/${id}`, {
@@ -151,8 +175,7 @@ export default function ModulesPage() {
       const d = await res.json()
       if (!res.ok) throw new Error(d.error ?? 'Action failed')
       if (action === 'update') {
-        window.location.assign('/cactus-status/redeploying')
-        return
+        setNotice('Module updated. Your changes are waiting to go live - review and redeploy from Notifications.')
       }
       await loadDirectory()
       router.refresh()
@@ -173,6 +196,7 @@ export default function ModulesPage() {
     if (!uninstallModal) return
     setUninstalling(true)
     setError('')
+    setNotice('')
     try {
       const res = await fetch(`/api/admin/modules/${uninstallModal.id}`, {
         method: 'DELETE',
@@ -182,9 +206,12 @@ export default function ModulesPage() {
       const d = await res.json()
       if (!res.ok) throw new Error(d.error ?? 'Uninstall failed')
       setUninstallModal(null)
-      window.location.assign('/cactus-status/redeploying')
+      setNotice('Module uninstalled. Your changes are waiting to go live - review and redeploy from Notifications.')
+      await loadDirectory()
+      router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Uninstall failed')
+    } finally {
       setUninstalling(false)
     }
   }
@@ -201,6 +228,7 @@ export default function ModulesPage() {
       </div>
 
       {error && <div className="alert alert-danger">{error}</div>}
+      {notice && <div className="alert alert-info">{notice}</div>}
 
       {ghStatus && !ghStatus.hasPat && !ghStatus.connected && (
         <div className="alert alert-warning">
