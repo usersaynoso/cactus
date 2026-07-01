@@ -199,18 +199,27 @@ export async function syncCoreFromUpstream(
   const { data: headCommit } = await octokit.rest.git.getCommit({ owner: adminOwner, repo: adminRepo, commit_sha: headSha })
   const baseTreeSha = headCommit.tree.sha
 
-  // Collect changed files between fromTag and toTag on upstream, with pagination
-  const allFiles: Array<{ filename: string; status: string; previous_filename?: string }> = []
-  let page = 1
-  while (true) {
-    const { data: compare } = await octokit.rest.repos.compareCommits({
-      owner: upOwner, repo: upRepo, base: fromTag, head: toTag, per_page: 100, page,
+  // Diff the two tags by their tree contents (path + blob sha) rather than via
+  // compareCommits: the upstream repo's history was rewritten at one point, so
+  // old and new tags can share no common ancestor, which makes GitHub's
+  // three-dot compare (and its merge-base requirement) fail outright. A raw
+  // tree diff doesn't care about ancestry at all.
+  type UpstreamEntry = { sha: string; mode: '100644' | '100755' }
+  const getUpstreamTree = async (ref: string): Promise<Map<string, UpstreamEntry>> => {
+    const { data } = await octokit.rest.git.getTree({
+      owner: upOwner, repo: upRepo, tree_sha: ref, recursive: 'true',
     })
-    const batch = compare.files ?? []
-    allFiles.push(...batch)
-    if (batch.length < 100) break
-    page++
+    const map = new Map<string, UpstreamEntry>()
+    for (const item of data.tree) {
+      if (item.path && item.type === 'blob' && item.sha) {
+        map.set(item.path, { sha: item.sha, mode: item.mode === '100755' ? '100755' : '100644' })
+      }
+    }
+    return map
   }
+
+  const fromTree = await getUpstreamTree(fromTag)
+  const toTree = await getUpstreamTree(toTag)
 
   // Build tree entries, skipping modules/ and .gitmodules
   type TreeEntry = {
@@ -223,34 +232,10 @@ export async function syncCoreFromUpstream(
   const treeEntries: TreeEntry[] = []
   const skipped = (path: string) => path === '.gitmodules' || path.startsWith('modules/')
 
-  // Fetch the upstream tree at toTag to get file modes
-  const modeMap = new Map<string, '100644' | '100755'>()
-  try {
-    const { data: tree } = await octokit.rest.git.getTree({
-      owner: upOwner, repo: upRepo, tree_sha: toTag, recursive: 'true',
-    })
-    for (const item of tree.tree) {
-      if (item.path && item.type === 'blob') {
-        modeMap.set(item.path, item.mode === '100755' ? '100755' : '100644')
-      }
-    }
-  } catch {
-    // If we can't get the tree, default to 100644 for all files
-  }
-
-  for (const file of allFiles) {
-    const path = file.filename
+  for (const [path, toEntry] of toTree) {
     if (skipped(path)) continue
-
-    if (file.status === 'removed') {
-      treeEntries.push({ path, mode: '100644', type: 'blob', sha: null })
-      continue
-    }
-
-    // For renamed files: delete the old path
-    if (file.status === 'renamed' && file.previous_filename && !skipped(file.previous_filename)) {
-      treeEntries.push({ path: file.previous_filename, mode: '100644', type: 'blob', sha: null })
-    }
+    const fromEntry = fromTree.get(path)
+    if (fromEntry && fromEntry.sha === toEntry.sha) continue // unchanged
 
     // Fetch content from upstream at toTag and create blob in admin repo
     const { data: content } = await octokit.rest.repos.getContent({
@@ -264,8 +249,12 @@ export async function syncCoreFromUpstream(
       encoding: 'base64',
     })
 
-    const mode = modeMap.get(path) ?? '100644'
-    treeEntries.push({ path, mode, type: 'blob', sha: blob.sha })
+    treeEntries.push({ path, mode: toEntry.mode, type: 'blob', sha: blob.sha })
+  }
+
+  for (const path of fromTree.keys()) {
+    if (skipped(path) || toTree.has(path)) continue
+    treeEntries.push({ path, mode: '100644', type: 'blob', sha: null })
   }
 
   if (treeEntries.length === 0) {
