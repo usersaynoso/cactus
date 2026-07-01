@@ -100,9 +100,7 @@ export default function AdminShell({ adminPath, userRole, siteName, version, chi
             className="admin-sidebar-logo-img"
           />
           {!collapsed && <span className="admin-sidebar-logo-text">{siteName}</span>}
-          {!collapsed && (
-            <NotificationBell adminPath={adminPath} unreadCount={unreadCount} />
-          )}
+          {!collapsed && <div className="admin-sidebar-logo-theme"><ThemeToggle compact /></div>}
           <button
             className="admin-sidebar-close"
             onClick={() => setMobileOpen(false)}
@@ -113,26 +111,30 @@ export default function AdminShell({ adminPath, userRole, siteName, version, chi
         </div>
 
         {collapsed && (
+          <div className="admin-sidebar-theme admin-sidebar-theme--collapsed">
+            <ThemeToggle compact collapsed />
+          </div>
+        )}
+
+        {collapsed && (
           <div className="admin-sidebar-bell-row">
             <NotificationBell adminPath={adminPath} unreadCount={unreadCount} collapsed />
           </div>
         )}
 
-        {/* Theme toggle — sits beneath the logo and notification bell, centred */}
-        <div className={`admin-sidebar-theme${collapsed ? ' admin-sidebar-theme--collapsed' : ''}`}>
-          <ThemeToggle compact collapsed={collapsed} />
+        {/* Desktop collapse/expand toggle + notification bell (expanded) */}
+        <div className="admin-sidebar-toggle-row">
+          <button
+            className="admin-sidebar-toggle"
+            onClick={toggleCollapsed}
+            title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            <span className="admin-sidebar-toggle-icon">{collapsed ? '›' : '‹'}</span>
+            {!collapsed && <span className="admin-sidebar-toggle-label">Collapse</span>}
+          </button>
+          {!collapsed && <NotificationBell adminPath={adminPath} unreadCount={unreadCount} />}
         </div>
-
-        {/* Desktop collapse/expand toggle — sits above the nav as a header control */}
-        <button
-          className="admin-sidebar-toggle"
-          onClick={toggleCollapsed}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <span className="admin-sidebar-toggle-icon">{collapsed ? '›' : '‹'}</span>
-          {!collapsed && <span className="admin-sidebar-toggle-label">Collapse</span>}
-        </button>
 
         <AdminNav
           adminPath={adminPath}

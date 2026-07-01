@@ -121,7 +121,7 @@ export default function StyleGuidePage() {
         }
         setLoading(false)
       })
-      .catch(() => { setError('Failed to load style guide'); setLoading(false) })
+      .catch(() => { setError('Failed to load styles'); setLoading(false) })
   }, [])
 
   const handleSave = useCallback(async () => {
@@ -176,12 +176,12 @@ export default function StyleGuidePage() {
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.625rem 1.25rem', background: 'var(--admin-bg-subtle)', borderBottom: '1px solid var(--color-border)', fontSize: '0.8125rem' }}>
-        <span style={{ fontWeight: 600, color: 'var(--color-fg)', fontSize: '0.9375rem' }}>Style Guide</span>
+        <span style={{ fontWeight: 600, color: 'var(--color-fg)', fontSize: '0.9375rem' }}>Styles</span>
         <span style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           {error && <span style={{ color: 'var(--color-danger)' }}>{error}</span>}
           {saved && <span style={{ color: 'var(--color-success)' }}>Saved ✓</span>}
           <button className="btn btn-primary" onClick={handleSave} disabled={saving} style={{ fontSize: '0.8125rem', padding: '0.375rem 1rem' }}>
-            {saving ? 'Saving…' : 'Save Style Guide'}
+            {saving ? 'Saving…' : 'Save Styles'}
           </button>
         </span>
       </div>
@@ -189,7 +189,7 @@ export default function StyleGuidePage() {
       <div style={{ padding: '2rem', maxWidth: 720 }}>
 
         <Section title="Colour palette">
-          <p style={{ fontSize: '0.875rem', color: 'var(--color-muted)', margin: '0 0 1rem' }}>Up to 6 named colours. Each colour has a light and dark mode variant. These become the only colour options throughout the layout builder.</p>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-muted)', margin: '0 0 1rem' }}>Up to 6 named colours. Each colour has a light and dark mode variant. These become the only colour options throughout Layouts.</p>
           {tokens.colours.map((c, i) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr auto', gap: '0.75rem', alignItems: 'end', marginBottom: '0.75rem', padding: '0.75rem', background: 'var(--admin-bg-subtle)', border: '1px solid var(--color-border)', borderRadius: 6 }}>
               <div className="field" style={{ margin: 0 }}>
@@ -287,7 +287,7 @@ export default function StyleGuidePage() {
 
         <div style={{ marginTop: '2rem', display: 'flex', gap: '1rem' }}>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving…' : 'Save Style Guide'}
+            {saving ? 'Saving…' : 'Save Styles'}
           </button>
           {saved && <span style={{ color: 'var(--color-success)', alignSelf: 'center' }}>Saved ✓</span>}
         </div>

@@ -459,11 +459,15 @@ a:hover {
   display: flex;
   justify-content: center;
   padding: var(--space-2) var(--space-3) var(--space-3);
-  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 .admin-sidebar-theme--collapsed {
   padding: var(--space-2) var(--space-2) var(--space-3);
+}
+
+.admin-sidebar-logo-theme {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 /* Sidebar nav items */
@@ -693,21 +697,25 @@ a:hover {
 }
 
 /* Collapse/expand toggle */
+.admin-sidebar-toggle-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
 .admin-sidebar-toggle {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  width: 100%;
+  flex: 1;
   padding: var(--space-3);
   background: none;
   border: none;
-  border-bottom: 1px solid var(--color-border);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
   font-family: inherit;
   cursor: pointer;
   transition: background var(--dur-base), color var(--dur-base);
-  flex-shrink: 0;
   text-align: left;
 }
 .admin-sidebar-toggle:hover {

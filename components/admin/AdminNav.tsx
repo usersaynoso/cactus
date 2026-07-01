@@ -28,8 +28,8 @@ export default function AdminNav({ adminPath, userRole, version, collapsed, onNa
     { href: `${base}/pages`,           label: 'Pages',         icon: '📄' },
     { href: `${base}/menus`,           label: 'Menus',         icon: '☰' },
     { href: `${base}/media`,           label: 'Media',         icon: '🖼' },
-    { href: `${base}/appearance`,      label: 'Style Guide',   icon: '🎨' },
-    { href: `${base}/layouts`,         label: 'Layout Builder', icon: '📐' },
+    { href: `${base}/appearance`,      label: 'Styles',        icon: '🎨' },
+    { href: `${base}/layouts`,         label: 'Layouts',       icon: '📐' },
     { href: `${base}/users`,           label: 'Users',         icon: '👥' },
     { href: `${base}/roles`,           label: 'Roles',         icon: '🔑' },
     { href: `${base}/modules`,         label: 'Modules',       icon: '🧩' },
@@ -87,7 +87,7 @@ export default function AdminNav({ adminPath, userRole, version, collapsed, onNa
           title={collapsed ? 'My Account' : undefined}
           onClick={onNavClick}
         >
-          <span>👤</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M20 21a8 8 0 1 0-16 0" /></svg>
           {!collapsed && <span>My Account</span>}
         </Link>
         <form action="/api/auth/logout" method="POST">
