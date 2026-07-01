@@ -101,6 +101,18 @@ To add a new passkey:
 
 You can register multiple passkeys - for example, one on your laptop and one on your phone.
 
+### Authenticator app
+
+If a passkey isn't an option on your device, you can sign in with an authenticator app instead (Google Authenticator, Authy, 1Password, and similar apps all work). It's just as secure as a passkey - a different way of proving it's really you.
+
+To set it up:
+
+1. Go to **My account → Authenticator app** and click **Set up authenticator app**.
+2. Scan the QR code with your authenticator app, or type in the key shown underneath if you can't scan it.
+3. Enter the 6-digit code your app shows to confirm it's connected.
+
+Once it's set up, you'll see an **"Use authenticator app instead"** option on the sign-in page. Click **Remove** on the account page if you want to stop using it.
+
 ### Password
 
 If email is set up on your site, you can also sign in with a password and a one-time code sent to your email. To set or change your password, go to **My account → Password**.

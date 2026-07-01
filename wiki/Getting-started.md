@@ -95,7 +95,7 @@ The wizard runs once, at `/_setup`, and completes in three steps:
 
 1. **Connect your project** - confirms required variables are set and your Vercel project is linked. If `DATABASE_URL` is absent, you will be offered one of the three paths below.
 2. **Database** - provisions or connects your PostgreSQL database and runs the schema migration.
-3. **Account & configure** - enter a username and email, register a passkey (fingerprint, Face ID, or security key), then choose your secret admin path, site name, and timezone.
+3. **Account & configure** - enter a username and email, then either register a passkey (fingerprint, Face ID, or security key) or, via the **"Use Token instead of Passkeys"** link, set up an authenticator app (TOTP) instead - both are equally valid ways to sign in. Then choose your secret admin path, site name, and timezone.
 
 When setup completes, the wizard marks `setupCompleted = true` and redirects you to the admin dashboard.
 
