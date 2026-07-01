@@ -17,6 +17,7 @@ Every visual aspect of the frontend is user-configurable through the **Appearanc
 | Page | Contents |
 |------|----------|
 | [Getting started](Getting-started) | Prerequisites, cloning, environment variables, first deploy, setup wizard |
+| [Running locally](Running-locally) | Local-development mode: `VERCEL !== '1'` detection, `.env.local` config, and which admin features are degraded |
 | [Configuration reference](Configuration-reference) | Every config-page tab and field |
 | [Architecture overview](Architecture-overview) | Request flow, auth, sessions, media pipeline, Appearance system, module system |
 | [Authoring a module](Authoring-a-module) | Complete guide to building and shipping a Cactus module |

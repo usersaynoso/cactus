@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
+import { isLocalMode } from '@/lib/config/env'
 import { NEON_REGIONS, type NeonRegionId } from '@/lib/config/neon-regions'
 import { triggerVercelRedeploy } from '@/lib/vercel/deploy'
 import { upsertVercelEnvVars } from '@/lib/vercel/env'
@@ -251,6 +252,15 @@ async function isSetupComplete(): Promise<boolean> {
 export async function POST(req: NextRequest) {
   if (await isSetupComplete()) {
     return NextResponse.json({ error: 'Setup is already complete' }, { status: 403 })
+  }
+
+  // Database provisioning writes DATABASE_URL to Vercel and triggers a redeploy -
+  // neither exists in local-development mode. Set DATABASE_URL in .env.local instead.
+  if (isLocalMode()) {
+    return NextResponse.json(
+      { status: 'error', error: 'Database provisioning is not available in local-development mode. Set DATABASE_URL in .env.local, run npm run db:migrate, and restart.' },
+      { status: 400 }
+    )
   }
 
   // Parse action and optional credential overrides from body.

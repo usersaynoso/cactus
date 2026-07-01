@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getEnvStatus, requiredEnvMissing } from '@/lib/config/env'
+import { getEnvStatus, requiredEnvMissing, isLocalMode } from '@/lib/config/env'
 
 // 'set'                    - DATABASE_URL is in runtime process.env — normal path
 // 'provisioned-redeploying' - DATABASE_URL was written to the Vercel project env vars
@@ -36,7 +36,12 @@ export async function GET() {
   const { required, optional } = getEnvStatus()
   const missingRequired = requiredEnvMissing()
   const databaseState = await resolveDatabaseState()
-  const vercelConfigured = !!(process.env.VERCEL_API_TOKEN && process.env.VERCEL_PROJECT_ID)
+  const localMode = isLocalMode()
+  // In local mode there is no Vercel project to connect, so report the gate as
+  // satisfied: the wizard then skips the connect step and goes straight to the
+  // database step (which expects DATABASE_URL in .env.local).
+  const vercelConfigured =
+    localMode || !!(process.env.VERCEL_API_TOKEN && process.env.VERCEL_PROJECT_ID)
 
   return NextResponse.json({
     required,
@@ -45,5 +50,6 @@ export async function GET() {
     databaseState,
     neonAvailable: !!process.env.NEON_API_KEY,
     vercelConfigured,
+    localMode,
   })
 }

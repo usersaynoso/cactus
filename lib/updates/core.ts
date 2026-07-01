@@ -6,7 +6,7 @@
 import { Octokit } from '@octokit/rest'
 import pkg from '@/package.json'
 import { getGithubClient } from '@/lib/github/client'
-import { isGitHubConfigured } from '@/lib/config/env'
+import { isGitHubConfigured, isLocalMode } from '@/lib/config/env'
 import { markdownToHtml } from '@/lib/sanitize'
 
 const UPSTREAM_REPO = process.env.CACTUS_CORE_REPO ?? 'usersaynoso/cactus-foundation'
@@ -36,6 +36,9 @@ export function compareVersions(a: string, b: string): number {
 }
 
 export type CoreUpdateStatus =
+  // Local-development mode: updates ship via git + Vercel redeploy, neither of
+  // which exists locally. The panel shows an informational note instead.
+  | { localMode: true; currentVersion: string }
   // Genuinely not configured: no GitHub App installation and no GITHUB_API_TOKEN.
   | { configured: false }
   // Configured, but the upstream read failed for some other reason.
@@ -59,6 +62,7 @@ const CACHE_TTL_MS = 10 * 60_000
 const ERROR_CACHE_TTL_MS = 30_000
 
 function isErrorStatus(s: CoreUpdateStatus): boolean {
+  if ('localMode' in s) return false
   return !s.configured || 'error' in s
 }
 
@@ -83,6 +87,12 @@ async function fetchUpstreamReleases(owner: string, repo: string, configured: bo
 }
 
 export async function getCoreUpdateStatus(opts?: { bust?: boolean }): Promise<CoreUpdateStatus> {
+  // Core updates rewrite the admin's GitHub repo and rely on a Vercel redeploy +
+  // webhook. None of that exists locally, so report local mode and skip the check.
+  if (isLocalMode()) {
+    return { localMode: true, currentVersion: pkg.version }
+  }
+
   const now = Date.now()
   if (!opts?.bust && _cachedStatus) {
     const ttl = isErrorStatus(_cachedStatus) ? ERROR_CACHE_TTL_MS : CACHE_TTL_MS

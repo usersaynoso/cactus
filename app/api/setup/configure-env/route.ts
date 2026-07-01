@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
+import { isLocalMode } from '@/lib/config/env'
 import { upsertVercelEnvVars } from '@/lib/vercel/env'
 
 const ALLOWED_KEYS = new Set([
@@ -39,6 +40,15 @@ async function isSetupComplete(): Promise<boolean> {
 export async function POST(req: NextRequest) {
   if (await isSetupComplete()) {
     return NextResponse.json({ error: 'Setup is already complete' }, { status: 403 })
+  }
+
+  // This route writes env vars to a Vercel project. In local-development mode
+  // there is no project: configuration lives in .env.local and is edited there.
+  if (isLocalMode()) {
+    return NextResponse.json(
+      { error: 'Environment variables are managed via .env.local in local-development mode.' },
+      { status: 400 }
+    )
   }
 
   const token = process.env.VERCEL_API_TOKEN

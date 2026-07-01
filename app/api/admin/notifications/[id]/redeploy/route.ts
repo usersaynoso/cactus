@@ -5,6 +5,7 @@ import { hasPermission } from '@/lib/permissions/check'
 import { errorResponse } from '@/lib/utils'
 import { startDeferredRedeploy } from '@/lib/deploy/redeploy'
 import { invalidateSiteConfigCache } from '@/lib/config/site'
+import { isLocalMode } from '@/lib/config/env'
 
 export const maxDuration = 60
 
@@ -14,6 +15,10 @@ export async function POST(_request: NextRequest, { params }: Params) {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
   if (!await hasPermission(user, 'config.manage')) return errorResponse('Forbidden', 403)
+
+  if (isLocalMode()) {
+    return errorResponse('Redeploys are not available in local-development mode. Deploy your changes via git + Vercel.', 503)
+  }
 
   const token = process.env.VERCEL_API_TOKEN
   const projectId = process.env.VERCEL_PROJECT_ID

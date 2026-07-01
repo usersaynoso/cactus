@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server'
 import { getSessionFromCookie } from '@/lib/auth/session'
 import { getVercelEnvVarKeys, upsertVercelEnvVars, deleteVercelEnvVars } from '@/lib/vercel/env'
 import { triggerVercelRedeploy } from '@/lib/vercel/deploy'
+import { isLocalMode } from '@/lib/config/env'
 import { errorResponse } from '@/lib/utils'
 import { ALL_PROVIDERS, envKeysForProvider } from '@/lib/media/providers'
 import { prisma } from '@/lib/db/prisma'
@@ -43,6 +44,17 @@ export async function GET() {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
 
+  // Local-development mode: config lives in .env.local, not a Vercel project.
+  // Report which managed vars are present in the running process (read-only) so
+  // the UI can show status without ever calling the Vercel API.
+  if (isLocalMode()) {
+    const vars: Record<string, boolean> = {}
+    for (const key of ALLOWED_KEYS) {
+      vars[key] = !!process.env[key]
+    }
+    return NextResponse.json({ vars, localMode: true })
+  }
+
   const token = process.env.VERCEL_API_TOKEN
   const projectId = process.env.VERCEL_PROJECT_ID
   if (!token || !projectId) {
@@ -69,6 +81,10 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
+
+  if (isLocalMode()) {
+    return errorResponse('Environment variables are managed via .env.local in local-development mode. Edit the file and restart the dev server.', 503)
+  }
 
   const token = process.env.VERCEL_API_TOKEN
   const projectId = process.env.VERCEL_PROJECT_ID
@@ -112,6 +128,10 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
+
+  if (isLocalMode()) {
+    return errorResponse('Environment variables are managed via .env.local in local-development mode. There is nothing to reset here.', 503)
+  }
 
   const token = process.env.VERCEL_API_TOKEN
   const projectId = process.env.VERCEL_PROJECT_ID

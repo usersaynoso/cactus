@@ -69,6 +69,8 @@ npm run dev
 
 Open http://localhost:3000. If the database is empty (no `SiteConfig` row), you'll be redirected to `/_setup` to run the setup wizard.
 
+When Cactus runs off Vercel it switches into **local-development mode** (detected by the absence of Vercel's `VERCEL=1` variable). The setup wizard skips the Vercel connect step and reads config from `.env.local`; the `VERCEL_API_TOKEN`/`VERCEL_PROJECT_ID` variables can be left unset, and you set `DATABASE_URL`, `SESSION_SECRET`, and `SITE_URL`/`NEXT_PUBLIC_SITE_URL=http://localhost:3000` instead. Some admin features (the env editor, core/module updates, the redeploy buttons) are read-only or hidden locally. See **[Running locally](Running-locally)** for the full picture.
+
 ## First deploy to Vercel
 
 1. Push your repo to GitHub.

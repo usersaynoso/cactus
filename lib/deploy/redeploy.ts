@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db/prisma'
 import { triggerVercelRedeploy } from '@/lib/vercel/deploy'
 import { syncModulesJson } from '@/lib/modules/github'
 import { invalidateSiteConfigCache } from '@/lib/config/site'
+import { isLocalMode } from '@/lib/config/env'
 
 // Opens the redeploy gate (proxy traps admin requests on /cactus-status/redeploying
 // while pendingRedeployId is set), then in an after() callback ships the current
@@ -19,6 +20,12 @@ import { invalidateSiteConfigCache } from '@/lib/config/site'
 export async function startDeferredRedeploy(
   opts: { committedSince?: number } = {}
 ): Promise<{ triggered: boolean }> {
+  // Local-development mode has no git-push deploy or Vercel redeploy: report
+  // not-triggered so callers fall back to the deferred-notification path.
+  if (isLocalMode()) {
+    return { triggered: false }
+  }
+
   const token = process.env.VERCEL_API_TOKEN
   const projectId = process.env.VERCEL_PROJECT_ID
   if (!token || !projectId) {

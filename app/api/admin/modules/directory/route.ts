@@ -4,6 +4,7 @@ import { getSessionFromCookie } from '@/lib/auth/session'
 import { hasPermission } from '@/lib/permissions/check'
 import { errorResponse } from '@/lib/utils'
 import { getGithubClient } from '@/lib/github/client'
+import { isLocalMode } from '@/lib/config/env'
 import type { ModuleStatus } from '@prisma/client'
 
 const MODULE_ORG = 'cactus-foundation-modules'
@@ -32,12 +33,13 @@ export async function GET(request: NextRequest) {
   if (!await hasPermission(user, 'modules.manage')) return errorResponse('Forbidden', 403)
 
   const refresh = request.nextUrl.searchParams.get('refresh') === 'true'
+  const localMode = isLocalMode()
 
   const installedModules = await prisma.module.findMany({ orderBy: { installedAt: 'asc' } })
 
   const now = Date.now()
   if (!refresh && cachedDir && now - cachedAt < CACHE_TTL) {
-    return NextResponse.json({ modules: mergeWithInstalled(cachedDir, installedModules) })
+    return NextResponse.json({ modules: mergeWithInstalled(cachedDir, installedModules), localMode })
   }
 
   let orgRepos: Array<{ name: string; html_url: string; description: string | null }>
@@ -58,6 +60,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       modules: installedModules.map((m) => buildInstalledEntry(m)),
       directoryUnavailable: true,
+      localMode,
     })
   }
 
@@ -69,7 +72,7 @@ export async function GET(request: NextRequest) {
   }))
   cachedAt = now
 
-  return NextResponse.json({ modules: mergeWithInstalled(cachedDir, installedModules) })
+  return NextResponse.json({ modules: mergeWithInstalled(cachedDir, installedModules), localMode })
 }
 
 function normaliseUrl(url: string) {
