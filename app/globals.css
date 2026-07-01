@@ -418,6 +418,10 @@ a:hover {
   justify-content: center;
 }
 
+.admin-sidebar--collapsed .admin-sidebar-logo-link {
+  flex: none;
+}
+
 .admin-sidebar-logo-img {
   width: 28px;
   height: 28px;
