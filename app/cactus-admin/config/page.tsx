@@ -245,199 +245,190 @@ function UpdatesPanel() {
 
   if (checking && !status) {
     return (
-      <div style={{ marginBottom: '1.5rem' }}>
-        <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>Checking for updates&hellip;</p>
-        <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '1.5rem 0 0' }} />
+      <div className="card" style={{ marginBottom: '1rem' }}>
+        <h3 style={{ margin: '0 0 0.25rem', fontSize: '1rem' }}>Core updates</h3>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', margin: 0 }}>Checking for updates&hellip;</p>
       </div>
     )
   }
 
   if (!status) return null
 
-  const refreshRow = !('localMode' in status) && (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.5rem' }}>
-      <button
-        type="button"
-        className="btn btn-secondary"
-        style={{ fontSize: '0.8125rem' }}
-        disabled={checking}
-        onClick={() => runCheck(true)}
-      >
-        {checking ? 'Checking…' : 'Refresh'}
-      </button>
-    </div>
-  )
+  const isLocal = 'localMode' in status
 
-  const channelSelector = !('localMode' in status) && (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-      <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', marginRight: '0.25rem' }}>
-        Update channel:
-      </span>
-      <button
-        type="button"
-        className={channel === 'public' ? 'btn btn-primary' : 'btn btn-secondary'}
-        style={{ fontSize: '0.8125rem' }}
-        disabled={channelSaving}
-        onClick={() => handleChannelChange('public')}
-      >
-        Public
-      </button>
-      <button
-        type="button"
-        className={channel === 'beta' ? 'btn btn-primary' : 'btn btn-secondary'}
-        style={{ fontSize: '0.8125rem' }}
-        disabled={channelSaving}
-        onClick={() => handleChannelChange('beta')}
-      >
-        Beta
-      </button>
-      {channelSaving && (
-        <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>Saving&hellip;</span>
-      )}
-    </div>
-  )
+  let badge: React.ReactNode
+  let subtitle: string
+  let body: React.ReactNode
+  let confirmModal: React.ReactNode = null
 
-  if ('localMode' in status) {
-    return (
-      <div style={{ marginBottom: '1.5rem' }}>
-        <div className="alert alert-info" style={{ fontSize: '0.875rem' }}>
-          You&rsquo;re running in local-development mode (v{status.currentVersion}). Core updates ship via git and a
-          Vercel redeploy, so they&rsquo;re managed outside the admin here - pull the latest Cactus Foundation release
-          and redeploy to update.
-        </div>
-        <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '1.5rem 0 0' }} />
+  if (isLocal) {
+    badge = <span className="badge badge-default">Local dev</span>
+    subtitle = `Running v${status.currentVersion}`
+    body = (
+      <div className="alert alert-info" style={{ fontSize: 'var(--text-sm)' }}>
+        You&rsquo;re running in local-development mode. Core updates ship via git and a Vercel redeploy, so
+        they&rsquo;re managed outside the admin here - pull the latest Cactus Foundation release and redeploy
+        to update.
       </div>
     )
-  }
-
-  if (!status.configured) {
-    return (
-      <div style={{ marginBottom: '1.5rem' }}>
-        {refreshRow}
-        {channelSelector}
-        <div className="alert alert-info" style={{ fontSize: '0.875rem' }}>
-          Automatic updates require GitHub to be configured. Connect a GitHub App or set{' '}
-          <code>GITHUB_API_TOKEN</code> in{' '}
-          <a href="?tab=integrations" style={{ color: 'var(--color-primary)' }}>Settings → Integrations</a>.
-        </div>
-        <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '1.5rem 0 0' }} />
+  } else if (!status.configured) {
+    badge = <span className="badge badge-default">Not connected</span>
+    subtitle = 'Cactus Foundation core version'
+    body = (
+      <div className="alert alert-info" style={{ fontSize: 'var(--text-sm)' }}>
+        Automatic updates require GitHub to be configured. Connect a GitHub App or set{' '}
+        <code>GITHUB_API_TOKEN</code> in{' '}
+        <a href="?tab=integrations" style={{ color: 'var(--color-primary)' }}>Settings → Integrations</a>.
       </div>
     )
-  }
-
-  if ('error' in status) {
-    return (
-      <div style={{ marginBottom: '1.5rem' }}>
-        {refreshRow}
-        {channelSelector}
-        <div className="alert alert-warning" style={{ fontSize: '0.875rem' }}>
-          Couldn&rsquo;t check for updates right now. Please try again later.
-        </div>
-        <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '1.5rem 0 0' }} />
+  } else if ('error' in status) {
+    badge = <span className="badge badge-warning">Check failed</span>
+    subtitle = 'Cactus Foundation core version'
+    body = (
+      <div className="alert alert-warning" style={{ fontSize: 'var(--text-sm)' }}>
+        Couldn&rsquo;t check for updates right now. Please try again later.
       </div>
     )
-  }
-
-  if (!status.updateAvailable) {
-    return (
-      <div style={{ marginBottom: '1.5rem' }}>
-        {refreshRow}
-        {channelSelector}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '1.5rem' }}>
-          <span className="badge badge-success">Up to date</span>
-          <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
-            You&rsquo;re on v{status.currentVersion} — the latest release.
-          </span>
-        </div>
-        <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0 0 1.5rem' }} />
-      </div>
+  } else if (!status.updateAvailable) {
+    badge = <span className="badge badge-success">Up to date</span>
+    subtitle = `Running v${status.currentVersion}`
+    body = (
+      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', margin: 0 }}>
+        You&rsquo;re on the latest release.
+      </p>
     )
-  }
-
-  return (
-    <div style={{ marginBottom: '1.5rem' }}>
-      {refreshRow}
-      {channelSelector}
-      <div className="card" style={{ borderColor: 'var(--color-primary)', marginBottom: '1.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-          <div>
-            <h2 style={{ margin: '0 0 0.25rem', fontSize: '1rem', fontWeight: 600 }}>
-              Update available
-            </h2>
-            <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
-              v{status.currentVersion} &rarr; <strong>v{status.latestVersion}</strong>{' '}
-              <span className="badge" style={{ fontSize: '0.7rem', marginLeft: '0.25rem' }}>new</span>
-            </p>
-          </div>
+  } else {
+    badge = <span className="badge badge-primary">Update available</span>
+    subtitle = `Running v${status.currentVersion}`
+    body = (
+      <div>
+        <p style={{ fontSize: 'var(--text-sm)', margin: '0 0 0.75rem' }}>
+          v{status.currentVersion} &rarr; <strong>v{status.latestVersion}</strong>{' '}
           <a
             href={status.latestUrl}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' }}
+            style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)', marginLeft: '0.25rem' }}
           >
             View on GitHub →
           </a>
-        </div>
+        </p>
 
         {status.releaseNotesHtml && (
           <div style={{ marginBottom: '0.75rem' }}>
             <button
               type="button"
               onClick={() => setShowNotes((s) => !s)}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: '0.875rem', color: 'var(--color-primary)', fontFamily: 'inherit' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 'var(--text-sm)', color: 'var(--color-primary)', fontFamily: 'inherit' }}
             >
               {showNotes ? 'Hide' : "What's new"} {showNotes ? '▲' : '▼'}
             </button>
             {showNotes && (
               <div
-                style={{ marginTop: '0.625rem', border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.75rem 1rem', maxHeight: '16rem', overflowY: 'auto', fontSize: '0.8125rem', lineHeight: 1.6 }}
+                style={{ marginTop: '0.625rem', border: '1px solid var(--color-border)', borderRadius: 6, padding: '0.75rem 1rem', maxHeight: '16rem', overflowY: 'auto', fontSize: 'var(--text-sm)', lineHeight: 1.6 }}
                 dangerouslySetInnerHTML={{ __html: status.releaseNotesHtml }}
               />
             )}
           </div>
         )}
 
-        {updateError && (
-          <div className="alert alert-danger" style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>
-            {updateError}
-          </div>
-        )}
+        <button
+          className="btn btn-primary"
+          style={{ fontSize: 'var(--text-sm)' }}
+          onClick={() => { setUpdateError(''); setShowConfirm(true) }}
+        >
+          Update now
+        </button>
+      </div>
+    )
 
-        {!showConfirm && (
-          <button className="btn btn-primary" style={{ fontSize: '0.875rem' }} onClick={() => setShowConfirm(true)}>
-            Update now
-          </button>
-        )}
-
-        {showConfirm && (
-          <div className="card" style={{ marginTop: '0.5rem', background: 'var(--color-bg-subtle)' }}>
-            <p style={{ fontSize: '0.875rem', marginBottom: '0.75rem' }}>
-              This will copy the updated core files from the upstream Cactus Foundation repository
-              into your GitHub repo and trigger a redeploy. Your modules, content, and database are
-              not affected.
+    if (showConfirm) {
+      confirmModal = (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onClick={(e) => { if (e.target === e.currentTarget && !updating) setShowConfirm(false) }}
+        >
+          <div className="card" style={{ maxWidth: '480px', width: '100%', margin: '1rem' }}>
+            <h2 className="card-title">Update to v{status.latestVersion}</h2>
+            <p style={{ color: 'var(--color-text-muted)', marginBottom: '1.5rem' }}>
+              This copies the updated core files from the upstream Cactus Foundation repository into your
+              GitHub repo and triggers a redeploy. Your modules, content, and database are not affected.
             </p>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button
-                className="btn btn-primary"
-                style={{ fontSize: '0.875rem' }}
-                disabled={updating}
-                onClick={handleUpdate}
-              >
-                {updating ? 'Updating…' : 'Confirm update'}
-              </button>
+            {updateError && (
+              <div className="alert alert-danger" style={{ fontSize: 'var(--text-sm)', marginBottom: '1rem' }}>
+                {updateError}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
               <button
                 className="btn btn-secondary"
-                style={{ fontSize: '0.875rem' }}
                 disabled={updating}
                 onClick={() => { setShowConfirm(false); setUpdateError('') }}
               >
                 Cancel
               </button>
+              <button className="btn btn-primary" disabled={updating} onClick={handleUpdate}>
+                {updating ? 'Updating…' : 'Confirm update'}
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )
+    }
+  }
+
+  return (
+    <div className="card" style={{ marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', gap: '0.75rem' }}>
+        <div>
+          <h3 style={{ margin: '0 0 0.25rem', fontSize: '1rem' }}>Core updates</h3>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', margin: 0 }}>{subtitle}</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+          {badge}
+          {!isLocal && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              style={{ fontSize: 'var(--text-sm)' }}
+              disabled={checking}
+              onClick={() => runCheck(true)}
+            >
+              {checking ? 'Checking…' : 'Refresh'}
+            </button>
+          )}
+        </div>
       </div>
-      <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '0 0 1.5rem' }} />
+
+      {!isLocal && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>Update channel:</span>
+          <button
+            type="button"
+            className={channel === 'public' ? 'btn btn-primary' : 'btn btn-secondary'}
+            style={{ fontSize: 'var(--text-sm)' }}
+            disabled={channelSaving}
+            onClick={() => handleChannelChange('public')}
+          >
+            Public
+          </button>
+          <button
+            type="button"
+            className={channel === 'beta' ? 'btn btn-primary' : 'btn btn-secondary'}
+            style={{ fontSize: 'var(--text-sm)' }}
+            disabled={channelSaving}
+            onClick={() => handleChannelChange('beta')}
+          >
+            Beta
+          </button>
+          {channelSaving && (
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>Saving&hellip;</span>
+          )}
+        </div>
+      )}
+
+      {body}
+      {confirmModal}
     </div>
   )
 }
