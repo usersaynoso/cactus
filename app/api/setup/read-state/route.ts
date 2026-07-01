@@ -3,7 +3,10 @@ import { prisma } from '@/lib/db/prisma'
 
 export async function POST() {
   try {
-    const [config, adminUser] = await Promise.all([
+    // Setup is complete once a protected-role user exists — the wizard's job is
+    // done at that point. Refuse to keep serving the admin path and admin
+    // identity to unauthenticated callers for the life of the site.
+    const [config, adminUser, userCount] = await Promise.all([
       prisma.siteConfig.findUnique({
         where: { id: 'singleton' },
         select: { setupCompleted: true, adminPath: true, siteName: true, timezone: true },
@@ -12,7 +15,12 @@ export async function POST() {
         where: { role: { isProtected: true } },
         select: { username: true, email: true },
       }),
+      prisma.user.count(),
     ])
+
+    if (config?.setupCompleted && userCount > 0) {
+      return new NextResponse(null, { status: 404 })
+    }
 
     return NextResponse.json({
       setupCompleted: config?.setupCompleted ?? false,

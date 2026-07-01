@@ -8,6 +8,7 @@ import { createHmac } from 'crypto'
 import { prisma } from '@/lib/db/prisma'
 import { invalidateSiteConfigCache } from '@/lib/config/site'
 import { markModulesDeploySucceeded, markModulesDeployFailed } from '@/lib/deploy/reconcile'
+import { safeCompare } from '@/lib/auth/session'
 
 type VercelEvent = {
   type: 'deployment.succeeded' | 'deployment.error' | 'deployment.canceled' | string
@@ -18,7 +19,7 @@ type VercelEvent = {
 
 function verifySignature(body: string, signature: string, secret: string): boolean {
   const expected = createHmac('sha1', secret).update(body).digest('hex')
-  return signature === expected
+  return safeCompare(signature, expected)
 }
 
 export async function POST(request: NextRequest) {

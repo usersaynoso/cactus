@@ -1,11 +1,19 @@
 import { NextResponse } from 'next/server'
 import { getSessionFromCookie } from '@/lib/auth/session'
+import { hasPermission } from '@/lib/permissions/check'
 import { prisma } from '@/lib/db/prisma'
 import { errorResponse } from '@/lib/utils'
 
 export async function GET() {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
+  // Used by both the config and modules settings pages — either permission
+  // is enough to view the GitHub App connection status.
+  const [canConfig, canModules] = await Promise.all([
+    hasPermission(user, 'config.manage'),
+    hasPermission(user, 'modules.manage'),
+  ])
+  if (!canConfig && !canModules) return errorResponse('Forbidden', 403)
 
   const key = process.env.ENCRYPTION_KEY ?? ''
   const encryptionKeySet = key.length > 0

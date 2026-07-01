@@ -13,6 +13,7 @@ import type { ConsentBannerConfig, ConsentCategory } from '@/lib/consent/types'
 export async function GET() {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
+  if (!await hasPermission(user, 'config.manage')) return errorResponse('Forbidden', 403)
 
   const config = await prisma.siteConfig.findUnique({ where: { id: 'singleton' } })
   if (!config) return errorResponse('Config not found', 404)

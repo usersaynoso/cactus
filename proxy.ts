@@ -105,6 +105,20 @@ function sessionToken(request: NextRequest): string | null {
   return request.cookies.get('cactus_session')?.value ?? null
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+
+// Defence-in-depth against cross-site request forgery: the session cookie is
+// already SameSite=lax + httpOnly, which blocks the common cross-site POST
+// vector, but this adds an explicit check. Only rejects when a browser-sent
+// Origin header is present and doesn't match — non-browser clients (which
+// send no Origin) are unaffected, so this never replaces session auth.
+function originMismatch(request: NextRequest): boolean {
+  if (SAFE_METHODS.has(request.method)) return false
+  const origin = request.headers.get('origin')
+  if (!origin) return false
+  return origin !== request.nextUrl.origin
+}
+
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl
 
@@ -217,6 +231,9 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   // blocking them would break authentication, passkey registration, and all
   // other API functionality even for admins trying to log in.
   if (pathname.startsWith('/api/')) {
+    if (originMismatch(request)) {
+      return withSecurity(NextResponse.json({ error: 'Origin not allowed' }, { status: 403 }))
+    }
     return withSecurity(NextResponse.next())
   }
 

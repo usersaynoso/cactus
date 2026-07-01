@@ -19,7 +19,10 @@ export async function verifyTurnstile(token?: string): Promise<boolean> {
     const data = (await res.json()) as { success: boolean }
     return data.success === true
   } catch {
-    // Fail open on network error
-    return true
+    // Turnstile IS configured here, so a network error/timeout must fail
+    // closed — rate limiting is the only other gate against bots, and
+    // failing open would let an attacker who can induce timeouts disable
+    // the bot check entirely.
+    return false
   }
 }

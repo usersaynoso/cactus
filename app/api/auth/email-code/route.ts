@@ -13,7 +13,7 @@ const Body = z.object({
 })
 
 export async function POST(request: NextRequest) {
-  const ip = getClientIp(request)
+  const ip = await getClientIp(request)
   const rl = await checkAndRecord('email_code', [`ip:${ip}`])
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Too many attempts. Please wait.' }, { status: 429 })

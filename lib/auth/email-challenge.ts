@@ -1,5 +1,6 @@
 import { createHash, randomInt } from 'crypto'
 import { prisma } from '@/lib/db/prisma'
+import { safeCompare } from '@/lib/auth/session'
 
 const CODE_LENGTH = 6
 const CODE_TTL_MS = 10 * 60 * 1000 // 10 minutes
@@ -58,7 +59,7 @@ export async function verifyEmailChallenge(
   }
 
   const codeHash = hashCode(code.trim())
-  if (codeHash !== challenge.codeHash) {
+  if (!safeCompare(codeHash, challenge.codeHash)) {
     await prisma.emailChallenge.update({
       where: { id: challenge.id },
       data: { attempts: { increment: 1 } },

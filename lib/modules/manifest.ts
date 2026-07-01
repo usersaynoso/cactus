@@ -80,15 +80,15 @@ export function validateTablePrefixUnique(
 }
 
 // Fetch and parse a manifest from a public GitHub repo's raw URL.
+// The raw URL is built exclusively from a validated owner/repo pair (never from
+// the caller's string directly) so a non-github.com repoUrl can never reach
+// fetch() with the GitHub token attached — see parseGitHubRepo.
 export async function fetchManifestFromRepo(
   repoUrl: string,
   filename: 'cactus.module.json' | 'cactus.theme.json'
 ): Promise<unknown> {
-  // Convert github.com URL to raw.githubusercontent.com
-  const raw = repoUrl
-    .replace('https://github.com/', 'https://raw.githubusercontent.com/')
-    .replace(/\.git$/, '')
-    + `/HEAD/${filename}`
+  const { owner, repo } = parseGitHubRepo(repoUrl)
+  const raw = `https://raw.githubusercontent.com/${owner}/${repo}/HEAD/${filename}`
 
   const token = await getGithubToken()
   const res = await fetch(raw, {
@@ -102,11 +102,25 @@ export async function fetchManifestFromRepo(
   return res.json()
 }
 
-// Parse owner/repo from a github.com URL
+// Parse owner/repo from a github.com URL. Validates the hostname strictly (via
+// URL parsing, not a substring match) so URLs like
+// "https://attacker.example/?x=github.com/a/b" are rejected rather than treated
+// as GitHub — that mismatch is what let the GitHub token leak to arbitrary hosts.
 export function parseGitHubRepo(repoUrl: string): { owner: string; repo: string } {
-  const match = repoUrl.match(/github\.com\/([^/]+)\/([^/]+?)(?:\.git)?(?:\/.*)?$/)
-  if (!match?.[1] || !match?.[2]) {
+  let url: URL
+  try {
+    url = new URL(repoUrl)
+  } catch {
     throw new Error(`Cannot parse GitHub repo from URL: ${repoUrl}`)
   }
-  return { owner: match[1], repo: match[2] }
+  if (url.protocol !== 'https:' || url.hostname !== 'github.com') {
+    throw new Error(`Repo URL must be an https://github.com/ URL: ${repoUrl}`)
+  }
+  const match = url.pathname.match(/^\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/)
+  const owner = match?.[1]
+  const repo = match?.[2]
+  if (!owner || !repo || !/^[A-Za-z0-9._-]+$/.test(owner) || !/^[A-Za-z0-9._-]+$/.test(repo)) {
+    throw new Error(`Cannot parse GitHub repo from URL: ${repoUrl}`)
+  }
+  return { owner, repo }
 }

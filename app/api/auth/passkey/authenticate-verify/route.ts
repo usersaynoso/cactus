@@ -4,7 +4,7 @@ import { createSession, setSessionCookie } from '@/lib/auth/session'
 import { checkAndRecord, getClientIp } from '@/lib/auth/rate-limit'
 
 export async function POST(request: NextRequest) {
-  const ip = getClientIp(request)
+  const ip = await getClientIp(request)
   const rl = await checkAndRecord('passkey_authenticate', [`ip:${ip}`])
   if (!rl.allowed) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

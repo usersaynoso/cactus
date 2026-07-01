@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server'
 import { getSessionFromCookie } from '@/lib/auth/session'
+import { isAdmin } from '@/lib/permissions/check'
 import { getVercelEnvVarKeys, upsertVercelEnvVars, deleteVercelEnvVars } from '@/lib/vercel/env'
 import { triggerVercelRedeploy } from '@/lib/vercel/deploy'
 import { isLocalMode } from '@/lib/config/env'
@@ -43,6 +44,7 @@ const ALLOWED_KEYS = new Set([
 export async function GET() {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
+  if (!isAdmin(user)) return errorResponse('Forbidden', 403)
 
   // Local-development mode: config lives in .env.local, not a Vercel project.
   // Report which managed vars are present in the running process (read-only) so
@@ -81,6 +83,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
+  if (!isAdmin(user)) return errorResponse('Forbidden', 403)
 
   if (isLocalMode()) {
     return errorResponse('Environment variables are managed via .env.local in local-development mode. Edit the file and restart the dev server.', 503)
@@ -128,6 +131,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE() {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
+  if (!isAdmin(user)) return errorResponse('Forbidden', 403)
 
   if (isLocalMode()) {
     return errorResponse('Environment variables are managed via .env.local in local-development mode. There is nothing to reset here.', 503)

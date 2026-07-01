@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { getSessionFromCookie } from '@/lib/auth/session'
+import { hasPermission } from '@/lib/permissions/check'
 import { invalidateSiteConfigCache, getPendingRedeployIdUncached, getAdminPathCached } from '@/lib/config/site'
 import { errorResponse } from '@/lib/utils'
 import { getLatestDeploymentStatus } from '@/lib/modules/github'
@@ -22,6 +23,7 @@ export async function GET() {
 export async function DELETE() {
   const user = await getSessionFromCookie()
   if (!user) return errorResponse('Not authenticated', 401)
+  if (!await hasPermission(user, 'config.manage')) return errorResponse('Forbidden', 403)
   await prisma.siteConfig.update({
     where: { id: 'singleton' },
     data: { pendingRedeployId: null, pendingRedeployAt: null },

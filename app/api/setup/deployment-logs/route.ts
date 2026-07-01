@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/db/prisma'
+import { getSessionFromCookie } from '@/lib/auth/session'
+import { hasPermission } from '@/lib/permissions/check'
 
 const VERCEL_API = 'https://api.vercel.com'
 
@@ -8,7 +11,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'deploymentId is required' }, { status: 400 })
   }
 
-  const token = process.env.VERCEL_API_TOKEN ?? req.nextUrl.searchParams.get('token') ?? ''
+  const [cfg, userCount] = await Promise.all([
+    prisma.siteConfig.findUnique({ where: { id: 'singleton' }, select: { setupCompleted: true } }),
+    prisma.user.count(),
+  ])
+  const setupComplete = (cfg?.setupCompleted ?? false) && userCount > 0
+
+  let token: string
+  if (setupComplete) {
+    // Post-setup: this is a real admin action (viewing a redeploy triggered from
+    // Settings), so require an authenticated, permitted session and never accept
+    // a caller-supplied token — only the server's own Vercel credential is used.
+    const user = await getSessionFromCookie()
+    if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    if (!await hasPermission(user, 'config.manage')) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    token = process.env.VERCEL_API_TOKEN ?? ''
+  } else {
+    // Pre-auth wizard flow: no admin account exists yet, so the "Connect Vercel"
+    // step passes the user-pasted token directly since VERCEL_API_TOKEN isn't
+    // saved to the environment until later in the wizard.
+    token = process.env.VERCEL_API_TOKEN ?? req.nextUrl.searchParams.get('token') ?? ''
+  }
   if (!token) {
     return NextResponse.json({ error: 'VERCEL_API_TOKEN not configured' }, { status: 500 })
   }

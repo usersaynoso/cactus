@@ -1,11 +1,23 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import { nanoid } from 'nanoid'
+import sharp from 'sharp'
 import type { Media, MediaProviderType } from '@prisma/client'
 import { prisma } from '@/lib/db/prisma'
 import { isProxied } from '@/lib/media/providers'
 
 const MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10 MB
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+
+// Maps each allowed client-supplied MIME type to the image format sharp
+// reports after decoding the actual bytes — used to catch a mismatched
+// content-type (e.g. a polyglot file) that the client's declared type alone
+// wouldn't reveal.
+const MIME_TO_SHARP_FORMAT: Record<string, string> = {
+  'image/jpeg': 'jpeg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+}
 
 export type UploadResult = {
   key: string
@@ -19,10 +31,11 @@ export type UploadValidationError = {
   reason: string
 }
 
-export function validateUpload(
+export async function validateUpload(
   mimeType: string,
-  sizeBytes: number
-): UploadValidationError | { valid: true } {
+  sizeBytes: number,
+  buffer: Buffer
+): Promise<UploadValidationError | { valid: true }> {
   if (!ALLOWED_TYPES.includes(mimeType)) {
     return {
       valid: false,
@@ -35,6 +48,20 @@ export function validateUpload(
       reason: `File size ${(sizeBytes / 1024 / 1024).toFixed(1)} MB exceeds the 10 MB limit.`,
     }
   }
+
+  let actualFormat: string | undefined
+  try {
+    actualFormat = (await sharp(buffer).metadata()).format
+  } catch {
+    return { valid: false, reason: 'File could not be read as a valid image.' }
+  }
+  if (actualFormat !== MIME_TO_SHARP_FORMAT[mimeType]) {
+    return {
+      valid: false,
+      reason: `File content does not match declared type "${mimeType}".`,
+    }
+  }
+
   return { valid: true }
 }
 

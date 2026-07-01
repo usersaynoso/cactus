@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   if (!file) return errorResponse('No file provided')
 
   const buffer = Buffer.from(await file.arrayBuffer())
-  const validation = validateUpload(file.type, buffer.length)
+  const validation = await validateUpload(file.type, buffer.length, buffer)
   if (!validation.valid) return errorResponse(validation.reason)
 
   const altText = formData.get('altText') as string | null

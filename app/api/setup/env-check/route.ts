@@ -1,5 +1,19 @@
 import { NextResponse } from 'next/server'
+import { prisma } from '@/lib/db/prisma'
 import { getEnvStatus, requiredEnvMissing, isLocalMode } from '@/lib/config/env'
+
+async function isSetupComplete(): Promise<boolean> {
+  try {
+    if (!process.env.DATABASE_URL) return false
+    const config = await prisma.siteConfig.findUnique({
+      where: { id: 'singleton' },
+      select: { setupCompleted: true },
+    })
+    return config?.setupCompleted ?? false
+  } catch {
+    return false
+  }
+}
 
 // 'set'                    - DATABASE_URL is in runtime process.env — normal path
 // 'provisioned-redeploying' - DATABASE_URL was written to the Vercel project env vars
@@ -33,6 +47,10 @@ async function resolveDatabaseState(): Promise<DatabaseState> {
 }
 
 export async function GET() {
+  if (await isSetupComplete()) {
+    return NextResponse.json({ error: 'Setup is already complete' }, { status: 403 })
+  }
+
   const { required, optional } = getEnvStatus()
   const missingRequired = requiredEnvMissing()
   const databaseState = await resolveDatabaseState()

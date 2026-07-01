@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/db/prisma'
 import { getSessionFromCookie } from '@/lib/auth/session'
+import { isAdmin } from '@/lib/permissions/check'
 import { refreshStarterLayouts } from '@/lib/setup/starterLayouts'
 import { upsertStylesInfoPage } from '@/lib/setup/stylesInfoPage'
 
@@ -31,6 +32,7 @@ async function seedStarterContent() {
 export async function POST(req: NextRequest) {
   const user = await getSessionFromCookie()
   if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+  if (!isAdmin(user)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   let body: { deleteSetupData?: boolean } = {}
   try { body = await req.json() } catch { /* no body */ }
