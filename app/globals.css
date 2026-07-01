@@ -433,18 +433,18 @@ a:hover {
 }
 .admin-sidebar-bell-count {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: -2px;
+  right: 2px;
   z-index: 10;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
   border-radius: var(--radius-full);
   background: #e53e3e;
   color: #fff;
-  font-size: 11px;
+  font-size: 9px;
   font-weight: var(--font-semibold);
-  line-height: 18px;
+  line-height: 14px;
   text-align: center;
   box-shadow: 0 0 0 2px var(--admin-sidebar-bg, var(--color-surface));
 }
