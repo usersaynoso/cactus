@@ -987,7 +987,7 @@ function ConfigPageInner() {
             </p>
             {templatesRefreshed && (
               <div className="alert alert-success" style={{ marginBottom: '1rem', fontSize: '0.875rem' }}>
-                Starter templates updated. Reload the layout builder to see changes.
+                Starter templates updated. Reload Layouts to see changes.
               </div>
             )}
             {templatesRefreshError && (
@@ -1198,7 +1198,7 @@ function ConfigPageInner() {
           </div>
           <div style={{ background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', borderRadius: 8, padding: '1rem', marginBottom: '1.25rem' }}>
             <p style={{ margin: '0 0 0.5rem', fontSize: '0.875rem', color: 'var(--color-fg)', fontWeight: 500 }}>Status page layouts</p>
-            <p style={{ margin: '0 0 0.75rem', fontSize: '0.8125rem', color: 'var(--color-muted)' }}>Customise the coming soon and maintenance screens in the Layout Builder.</p>
+            <p style={{ margin: '0 0 0.75rem', fontSize: '0.8125rem', color: 'var(--color-muted)' }}>Customise the coming soon and maintenance screens in Layouts.</p>
             <a href={`/${config.adminPath ?? ''}/layouts?type=statusPage`} style={{ fontSize: 'var(--text-sm)', color: 'var(--color-primary)' }}>Manage status page layouts →</a>
           </div>
           <label style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', cursor: 'pointer' }}>
