@@ -172,6 +172,27 @@ export async function getCoreUpdateStatus(
   }
 }
 
+function isBadObjectState(err: unknown): boolean {
+  return err instanceof Error && err.message.includes('BadObjectState')
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+
+// GitHub's Git Data API sometimes hasn't finished replicating blobs created
+// moments earlier, which surfaces as GitRPC::BadObjectState on the following
+// createTree call. Retrying after a short delay resolves it.
+async function retryOnBadObjectState<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn()
+    } catch (err) {
+      if (!isBadObjectState(err) || i === attempts - 1) throw err
+      await sleep(1000 * 2 ** i)
+    }
+  }
+  throw new Error('unreachable')
+}
+
 export type SyncResult = {
   commitSha: string
   fromVersion: string
@@ -264,11 +285,16 @@ export async function syncCoreFromUpstream(
   // Count only adds/modifies/renames (not deletes) for the user-facing count
   const fileCount = treeEntries.filter((e) => e.sha !== null).length
 
-  const { data: newTree } = await octokit.rest.git.createTree({
-    owner: adminOwner, repo: adminRepo,
-    base_tree: baseTreeSha,
-    tree: treeEntries,
-  })
+  // Newly created blobs can lag GitHub's storage replication by a second or two,
+  // which makes an immediate createTree fail with GitRPC::BadObjectState even
+  // though the blobs are valid. Retry with backoff before giving up.
+  const newTree = await retryOnBadObjectState(() =>
+    octokit.rest.git.createTree({
+      owner: adminOwner, repo: adminRepo,
+      base_tree: baseTreeSha,
+      tree: treeEntries,
+    })
+  ).then((r) => r.data)
 
   const { data: newCommit } = await octokit.rest.git.createCommit({
     owner: adminOwner, repo: adminRepo,
