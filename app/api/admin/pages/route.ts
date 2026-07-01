@@ -87,3 +87,28 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json(page, { status: 201 })
 }
+
+export async function DELETE(request: NextRequest) {
+  const user = await getSessionFromCookie()
+  if (!user) return errorResponse('Not authenticated', 401)
+  if (!await hasPermission(user, 'pages.delete')) return errorResponse('Forbidden', 403)
+
+  const parsed = z.object({ ids: z.array(z.string()).min(1).max(100) }).safeParse(
+    await request.json().catch(() => ({}))
+  )
+  if (!parsed.success) return errorResponse('Invalid input')
+  const { ids } = parsed.data
+
+  const config = await prisma.siteConfig.findUnique({ where: { id: 'singleton' } })
+  const refs = new Set([config?.privacyPolicyPageId, config?.termsPageId].filter(Boolean))
+  const blocked = ids.filter((id) => refs.has(id))
+  if (blocked.length > 0) {
+    return errorResponse('One or more pages are referenced in site settings. Update the settings first.', 409)
+  }
+
+  const pages = await prisma.infoPage.findMany({ where: { id: { in: ids } }, select: { id: true, slug: true } })
+  await prisma.infoPage.deleteMany({ where: { id: { in: ids } } })
+  for (const p of pages) revalidatePath(`/${p.slug}`)
+
+  return NextResponse.json({ ok: true, deleted: pages.length })
+}
