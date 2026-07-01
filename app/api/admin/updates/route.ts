@@ -72,7 +72,12 @@ export async function POST() {
   }
 
   // Fetch current status to get version numbers
-  const status = await getCoreUpdateStatus()
+  const cfg = await prisma.siteConfig.findUnique({
+    where: { id: 'singleton' },
+    select: { coreUpdateChannel: true },
+  })
+  const channel = (cfg?.coreUpdateChannel ?? 'public') as 'public' | 'beta'
+  const status = await getCoreUpdateStatus({ channel })
   if ('localMode' in status) {
     return errorResponse('Core updates are not available in local-development mode. Update via git and redeploy on Vercel.', 503)
   }
