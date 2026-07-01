@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import AdminNav from './AdminNav'
 import NotificationBell from './NotificationBell'
 import { ThemeToggle } from '@/components/ThemeToggle'
-import PendingDeployBanner from './PendingDeployBanner'
 import { AdminPathProvider } from './AdminPathContext'
 import type { Role } from '@prisma/client'
 
@@ -23,13 +22,12 @@ type Props = {
   children: React.ReactNode
   moduleNavEntries?: ModuleNavEntry[]
   unreadCount?: number
-  pendingDeployId?: string
 }
 
 // Auto-collapse when a puck editor page is open to maximise canvas space
 const PUCK_EDITOR_RE = /\/pages\/[^/]+$|\/appearance\/(header|footer)$|\/layouts\/[^/]+$/
 
-export default function AdminShell({ adminPath, userRole, siteName, version, children, moduleNavEntries, unreadCount, pendingDeployId }: Props) {
+export default function AdminShell({ adminPath, userRole, siteName, version, children, moduleNavEntries, unreadCount }: Props) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() =>
     typeof window !== 'undefined' && localStorage.getItem('cactus-sidebar-collapsed') === 'true'
@@ -147,7 +145,6 @@ export default function AdminShell({ adminPath, userRole, siteName, version, chi
       </aside>
 
       <div className="admin-main">
-        {pendingDeployId && <PendingDeployBanner notificationId={pendingDeployId} adminPath={adminPath} />}
         <div className={`admin-content${PUCK_EDITOR_RE.test(pathname) ? ' admin-content--puck' : ''}`}>
           {children}
         </div>

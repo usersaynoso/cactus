@@ -33,15 +33,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     redirect(`/${adminPath}/login`)
   }
 
-  const [config, activeModules, unreadCount, openNotification] = await Promise.all([
+  const [config, activeModules, unreadCount] = await Promise.all([
     prisma.siteConfig.findUnique({ where: { id: 'singleton' }, select: { siteName: true, designTokens: true } }),
     prisma.module.findMany({ where: { status: 'active' }, select: { manifest: true } }),
     getUnreadCount(),
-    prisma.notification.findFirst({
-      where: { type: 'deployment', deployInitiatedAt: null },
-      select: { id: true },
-      orderBy: { createdAt: 'desc' },
-    }),
   ])
 
   const moduleNavEntries: Array<{ label: string; path: string; icon?: string }> = []
@@ -73,7 +68,6 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         version={pkg.version}
         moduleNavEntries={moduleNavEntries}
         unreadCount={unreadCount}
-        pendingDeployId={openNotification?.id}
       >
         {children}
       </AdminShell>

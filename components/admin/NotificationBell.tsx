@@ -127,6 +127,7 @@ export default function NotificationBell({ adminPath, unreadCount = 0, collapsed
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[] | null>(null)
+  const [count, setCount] = useState(unreadCount)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [actionError, setActionError] = useState<Record<string, string>>({})
   const [pos, setPos] = useState({ top: 0, left: 0 })
@@ -138,12 +139,15 @@ export default function NotificationBell({ adminPath, unreadCount = 0, collapsed
 
   const base = `/${adminPath}`
   const href = `${base}/notifications`
-  const label = unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'
+  const label = count > 0 ? `Notifications (${count} unread)` : 'Notifications'
 
   const fetchNotifications = useCallback(() => {
     fetch('/api/admin/notifications')
       .then(r => r.json())
-      .then(data => setNotifications(data.notifications ?? []))
+      .then(data => {
+        setNotifications(data.notifications ?? [])
+        setCount(data.unreadCount ?? 0)
+      })
       .catch(() => setNotifications([]))
   }, [])
 
@@ -159,6 +163,21 @@ export default function NotificationBell({ adminPath, unreadCount = 0, collapsed
     if (!open) return
     fetchNotifications()
   }, [open, fetchNotifications])
+
+  // Poll for new notifications so the badge updates live, not just on
+  // full page reload / next server-rendered layout pass.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch('/api/admin/notifications')
+        .then(r => r.json())
+        .then(data => {
+          setCount(data.unreadCount ?? 0)
+          if (open) setNotifications(data.notifications ?? [])
+        })
+        .catch(() => {})
+    }, 20_000)
+    return () => clearInterval(interval)
+  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -196,6 +215,7 @@ export default function NotificationBell({ adminPath, unreadCount = 0, collapsed
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ read: true }),
       }).catch(() => {})
+      setCount(prev => Math.max(0, prev - 1))
     }
     setOpen(false)
     router.push(href)
@@ -227,6 +247,7 @@ export default function NotificationBell({ adminPath, unreadCount = 0, collapsed
       const d = await res.json()
       if (!res.ok) throw new Error(d.error ?? 'Action failed')
       setNotifications(prev => prev?.map(n => n.id === id ? { ...n, readAt: isRead ? null : new Date().toISOString() } : n) ?? null)
+      setCount(prev => isRead ? prev + 1 : Math.max(0, prev - 1))
       router.refresh()
     } catch (err: unknown) {
       setErr(id, err instanceof Error ? err.message : 'Action failed')
@@ -243,7 +264,11 @@ export default function NotificationBell({ adminPath, unreadCount = 0, collapsed
       const res = await fetch(`/api/admin/notifications/${id}`, { method: 'DELETE' })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error ?? 'Delete failed')
-      setNotifications(prev => prev?.filter(n => n.id !== id) ?? null)
+      setNotifications(prev => {
+        const deleted = prev?.find(n => n.id === id)
+        if (deleted && !deleted.readAt) setCount(c => Math.max(0, c - 1))
+        return prev?.filter(n => n.id !== id) ?? null
+      })
       router.refresh()
     } catch (err: unknown) {
       setErr(id, err instanceof Error ? err.message : 'Delete failed')
@@ -324,8 +349,8 @@ export default function NotificationBell({ adminPath, unreadCount = 0, collapsed
           <path d="M12 2a1 1 0 0 1 1 1v.5a7 7 0 0 1 6 6.9V15l1.7 2.3A1 1 0 0 1 19.9 19H4.1a1 1 0 0 1-.8-1.6L5 15v-4.6A7 7 0 0 1 11 3.5V3a1 1 0 0 1 1-1Z" />
           <path d="M10 19a2 2 0 1 0 4 0h-4Z" />
         </svg>
-        {unreadCount > 0 && (
-          <span className="admin-sidebar-bell-count">{unreadCount > 99 ? '99+' : unreadCount}</span>
+        {count > 0 && (
+          <span className="admin-sidebar-bell-count">{count > 99 ? '99+' : count}</span>
         )}
       </button>
 
