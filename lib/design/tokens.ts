@@ -233,22 +233,29 @@ function primaryVars(hex: string, mode: 'light' | 'dark'): string {
 }
 
 // Emit ONLY the semantic --color-primary family (light + dark) so the admin
-// chrome white-labels to the site's primary colour. Deliberately excludes the
-// spacing/radius/shadow and scoped `main …` rules from buildTokenStyles, which
-// would clash with the admin design system (e.g. its own --radius-lg) and must
-// not restyle admin content. Returns '' when there's no primary colour.
+// chrome white-labels to the site's primary colour and adopts the site's primary
+// font (--font-sans, the admin UI typeface - the mono/code font is left alone).
+// Deliberately excludes the spacing/radius/shadow and scoped `main …` rules from
+// buildTokenStyles, which would clash with the admin design system (e.g. its own
+// --radius-lg) and must not restyle admin content. Returns '' when there's
+// neither a primary colour nor a primary font.
 export function buildAdminThemeStyles(tokens: unknown): string {
   const t = (tokens && typeof tokens === 'object' ? tokens : {}) as Partial<DesignTokens>
   const colours = t.designSystem?.colours ?? []
   const primary = colours.find(c => c.id === 'primary') ?? colours[0]
-  if (!primary) return ''
-  const light = primaryVars(primary.light, 'light')
-  const dark = primaryVars(primary.dark || primary.light, 'dark')
-  return [
-    `:root,[data-theme="light"]{${light}}`,
-    `[data-theme="dark"]{${dark}}`,
-    `@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){${dark}}}`,
-  ].join('\n')
+  const fonts = t.designSystem?.fonts ?? []
+  const primaryFont = fonts.find(f => f.id === 'primary') ?? fonts[0]
+  // --font-sans lives on :root, so it applies in both light and dark.
+  const fontVar = primaryFont?.family ? `--font-sans: ${primaryFont.family};` : ''
+  if (!primary && !fontVar) return ''
+  const light = (primary ? primaryVars(primary.light, 'light') : '') + fontVar
+  const blocks = [`:root,[data-theme="light"]{${light}}`]
+  if (primary) {
+    const dark = primaryVars(primary.dark || primary.light, 'dark')
+    blocks.push(`[data-theme="dark"]{${dark}}`)
+    blocks.push(`@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){${dark}}}`)
+  }
+  return blocks.join('\n')
 }
 
 export function buildTokenStyles(tokens: unknown): string {
@@ -273,22 +280,47 @@ export function buildTokenStyles(tokens: unknown): string {
 
   const vars: string[] = []
 
+  // The "primary" global font (or the first defined font) is the site default
+  // typeface. Body text uses its own family when set, otherwise falls back to
+  // this - so setting the primary font actually changes the site font and an
+  // empty body-family box inherits it rather than the built-in Cactus face.
+  const primaryFont = ds.fonts?.find(f => f.id === 'primary') ?? ds.fonts?.[0]
   const body = ts?.body ?? {}
-  if (body.family) {
-    vars.push(`--font-body: ${body.family};`)
-    vars.push(`--font-heading: ${body.family};`)
+  const bodyFamily = body.family || primaryFont?.family
+  const bodyWeight = body.weight || primaryFont?.weight
+  if (bodyFamily) {
+    vars.push(`--font-body: ${bodyFamily};`)
+    vars.push(`--font-heading: ${bodyFamily};`)
+    // Override the base UI typeface too, so text outside <main> (header, footer)
+    // and native form controls (which don't inherit font-family) use the site font.
+    vars.push(`--font-sans: ${bodyFamily};`)
   }
   if (ts?.links?.colour) vars.push(`--color-link: ${ts.links.colour};`)
   if (ts?.links?.hoverColour) vars.push(`--color-link-hover: ${ts.links.hoverColour};`)
   if (ts?.background?.colour) vars.push(`--color-page-bg: ${ts.background.colour};`)
 
+  // Emit a Typo as CSS variables under a prefix, so components that render with
+  // inline styles (Puck blocks) can read them with `var(--prefix-x, fallback)`
+  // and reflect the theme without a scoped rule being able to reach them.
+  function typoVars(prefix: string, v: Typo) {
+    if (v.family)        vars.push(`--${prefix}-family: ${v.family};`)
+    if (v.weight)        vars.push(`--${prefix}-weight: ${v.weight};`)
+    if (v.size)          vars.push(`--${prefix}-size: ${v.size};`)
+    if (v.lineHeight)    vars.push(`--${prefix}-line-height: ${v.lineHeight};`)
+    if (v.letterSpacing) vars.push(`--${prefix}-letter-spacing: ${v.letterSpacing};`)
+    if (v.transform)     vars.push(`--${prefix}-transform: ${v.transform};`)
+    if (v.style)         vars.push(`--${prefix}-style: ${v.style};`)
+    if (v.decoration)    vars.push(`--${prefix}-decoration: ${v.decoration};`)
+  }
+
   for (const tag of ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'] as const) {
     const h = ts?.headings?.[tag] ?? {}
-    if (h.size)   vars.push(`--${tag}-size: ${h.size};`)
+    typoVars(tag, h)
     if (h.colour) vars.push(`--${tag}-color: ${h.colour};`)
   }
 
   const btns = ts?.buttons
+  if (btns?.typo)               typoVars('btn', btns.typo)
   if (btns?.textColour)         vars.push(`--btn-text-color: ${btns.textColour};`)
   if (btns?.bgColour)           vars.push(`--btn-bg: ${btns.bgColour};`)
   if (btns?.borderColour)       vars.push(`--btn-border: ${btns.borderColour};`)
@@ -304,10 +336,12 @@ export function buildTokenStyles(tokens: unknown): string {
   if (imgs?.borderWidth)  vars.push(`--img-border-width: ${imgs.borderWidth};`)
 
   const fields = ts?.formFields
+  if (fields?.typo)         typoVars('field', fields.typo)
   if (fields?.textColour)   vars.push(`--field-text: ${fields.textColour};`)
   if (fields?.bgColour)     vars.push(`--field-bg: ${fields.bgColour};`)
   if (fields?.borderColour) vars.push(`--field-border: ${fields.borderColour};`)
   if (fields?.borderRadius) vars.push(`--field-radius: ${fields.borderRadius};`)
+  if (fields?.labelTypo)    typoVars('field-label', fields.labelTypo)
   if (fields?.labelColour)  vars.push(`--field-label-color: ${fields.labelColour};`)
 
   const rootBlock = `:root,[data-theme="light"]{${lightColours}${fixed}${lightPrimary} ${vars.join(' ')}}`
@@ -332,7 +366,9 @@ export function buildTokenStyles(tokens: unknown): string {
   // Apply body typography to `main` itself so it cascades to all content -
   // including rich text, whose `.puck-richtext p` rule out-specificities a
   // plain `main p` selector and would otherwise ignore the chosen body font.
-  const bodyProps = [...typoProps(body)]
+  // typoProps only emits font-family when body.family is set; fall back to the
+  // primary global font so an empty body-family box still uses the site font.
+  const bodyProps = [...typoProps({ ...body, family: bodyFamily, weight: bodyWeight })]
   if (body.colour) bodyProps.push(`color: ${body.colour};`)
   if (bodyProps.length) scoped.push(`main{${bodyProps.join('')}}`)
 
@@ -356,10 +392,13 @@ export function buildTokenStyles(tokens: unknown): string {
     if (btns.padding)      btnProps.push(`padding: ${btns.padding};`)
     if (btnProps.length) scoped.push(`main button{${btnProps.join('')}}`)
 
+    // Hover: also target the Button block's <a class="cactus-btn">. Its base state
+    // is styled inline (Puck renders inline), so !important is needed for the
+    // hover rule to win over the inline background/colour.
     const hoverProps: string[] = []
-    if (btns.hover?.textColour) hoverProps.push(`color: ${btns.hover.textColour};`)
-    if (btns.hover?.bgColour)   hoverProps.push(`background: ${btns.hover.bgColour};`)
-    if (hoverProps.length) scoped.push(`main button:hover{${hoverProps.join('')}}`)
+    if (btns.hover?.textColour) hoverProps.push(`color: ${btns.hover.textColour} !important;`)
+    if (btns.hover?.bgColour)   hoverProps.push(`background: ${btns.hover.bgColour} !important;`)
+    if (hoverProps.length) scoped.push(`main button:hover,main .cactus-btn:hover{${hoverProps.join('')}}`)
   }
 
   if (imgs) {

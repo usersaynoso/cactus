@@ -533,9 +533,13 @@ The guard is wired into **Styles** (dirty on any token edit; also resets on pres
 
 Weight, transform, style, and text-decoration are dropdowns (not free text). If saved data holds a value outside the option list, it is surfaced as a "`<value>` (custom)" option so it is preserved rather than silently dropped. Size, line-height, and letter-spacing remain free-text (arbitrary CSS units).
 
+The **font-family picker** (`FontPickerField`) lists your named global fonts first under a "Your fonts" heading (picking one stores its `family` value), then the built-in `POPULAR_FONTS` list; free text is still accepted for any CSS font-family value. The global-fonts editor's own family field does not list the global fonts (it defines them).
+
 ### Validation
 
 `PATCH /api/admin/appearance` requires `appearance.manage` and shape-guards the payload: `designTokens` must be `null` (clear) or an object with `version === 2`; anything else is rejected with 400 rather than persisted.
+
+After a successful save the Styles page calls `router.refresh()`, which re-renders the server admin layout so its injected theme (`buildAdminThemeStyles` - primary colour + font) updates immediately without a manual reload.
 
 ### CSS output
 
@@ -570,7 +574,7 @@ Weight, transform, style, and text-decoration are dropdowns (not free text). If 
 
 **Why body typography targets `main`:** the body font/size/colour are emitted on `main` itself (not `main p`) so they cascade into rich-text content. `.puck-richtext p` is a class selector that would out-specificity a plain `main p` rule and ignore the chosen body font; setting the font on the `main` ancestor lets it inherit through instead.
 
-**The primary global font is the site default.** The `primary` global font (or the first defined font) provides the default `family`/`weight` for body text: `body.family || primaryFont.family` (same for weight). So changing the primary font actually restyles the site, and leaving the body font-family box empty inherits the primary font rather than the built-in Cactus face (which isn't even loaded on the public frontend, so it falls back to system-ui). Headings inherit this through the `main` cascade unless they set their own family. The admin chrome also adopts this font (see `buildAdminThemeStyles` below).
+**The primary global font is the site default.** The `primary` global font (or the first defined font) provides the default `family`/`weight` for body text: `body.family || primaryFont.family` (same for weight). So changing the primary font actually restyles the site, and leaving the body font-family box empty inherits the primary font rather than the built-in Cactus face (which isn't even loaded on the public frontend, so it falls back to system-ui). This font is emitted as `--font-body`/`--font-heading`, on the scoped `main{}` rule (for rich-text cascade), **and** as `--font-sans` - the base UI typeface - so text outside `<main>` (header, footer) and native form controls (which don't inherit `font-family`) also pick it up. Headings inherit through the `main` cascade unless they set their own family. The admin chrome also adopts this font (see `buildAdminThemeStyles` below).
 
 **Page background:** `themeStyle.background.colour` is emitted only as the `--color-page-bg` variable (no scoped rule). `globals.css` applies it via `body { background: var(--color-page-bg, var(--color-bg)); }`, so it covers the whole page (not just `main`). In the admin the variable is never emitted (`buildAdminThemeStyles` is a primary-only subset), so admin falls back to `--color-bg` and is unaffected.
 
@@ -591,11 +595,12 @@ Weight, transform, style, and text-decoration are dropdowns (not free text). If 
 
 The scoped `main …` rules only reach content with no inline styles (rich text, raw HTML). Puck blocks render with inline styles, which out-specificity any stylesheet rule, so a few blocks read the tokens **as CSS variables inline**, each with a fallback to the original built-in look (untouched sites are byte-identical):
 
-- **Button block** (`ButtonLink`) renders `<a class="cactus-btn">` reading `--btn-family/-weight/-size/-line-height/-letter-spacing/-transform/-style`, `--btn-radius`, `--btn-padding` for shape/type (all variants), and `--btn-bg`/`--btn-text-color`/`--btn-border`/`--btn-border-width` for the primary (default) variant's colours. Hover uses the token hover colours via `main a.cactus-btn:hover{…!important}` (the `!important` is required to beat the inline base state). Secondary/outline keep their own colours but still inherit shape/type and the global border.
+- **Button block** (`ButtonLink`) renders `<a class="cactus-btn">` reading `--btn-family/-weight/-size/-line-height/-letter-spacing/-transform/-style`, `--btn-radius`, `--btn-padding` for shape/type (all variants), and `--btn-bg`/`--btn-text-color`/`--btn-border`/`--btn-border-width` for the primary (default) variant's colours. Hover uses the token hover colours via `main .cactus-btn:hover{…!important}` (the `!important` is required to beat the inline base state). Secondary/outline keep their own colours but still inherit shape/type and the global border.
 - **Heading block** reads `--{level}-family/-size/-weight/-line-height/-letter-spacing/-transform/-style` and, when the colour choice is the default "dark", `--{level}-color`. An explicit muted/brand colour choice still wins.
 - **Image block** (`ImageBlock`) reads `--img-radius`, `--img-border-width`, `--img-border-color`.
+- **Contact-form module** (`ContactFormClient`) styles its public form via a `.cactus-contact-form`-scoped `<style>` reading `--field-*` (fields) and `--field-label-*` (labels) with neutral fallbacks, and its submit button uses the same `.cactus-btn` treatment as the Button block. It deliberately does **not** use the admin `.field`/`.btn` classes, which would out-specificity the site theme and lock the form to the admin (green primary) look.
 
-So `buildTokenStyles` emits full **typography** variable sets for headings (`--h1-…` through `--h6-…`) and buttons (`--btn-…`), not just the colour/size subset. Composite blocks (Hero, CTABanner, Card CTAs) keep their bespoke styling and deliberately do **not** consume the button/heading tokens, so their contextual designs (e.g. a CTA on a brand-colour background) are preserved.
+So `buildTokenStyles` emits full **typography** variable sets for headings (`--h1-…` through `--h6-…`), buttons (`--btn-…`), form fields (`--field-…`) and field labels (`--field-label-…`), not just the colour/size subset. Composite blocks (Hero, CTABanner, Card CTAs) keep their bespoke styling and deliberately do **not** consume the button/heading tokens, so their contextual designs (e.g. a CTA on a brand-colour background) are preserved.
 
 ### Dark mode
 

@@ -345,13 +345,29 @@ function ContentSlot(_props: any) {
 
 function Heading(props: any) {
   const { text, level, align, color, padding, animationType = 'none', animationDuration = 'normal', animationDelay = 'none' } = props
-  const colors: Record<string, string> = { dark: 'var(--color-fg)', muted: 'var(--color-muted)', brand: 'var(--color-primary)' }
+  const colors: Record<string, string> = { muted: 'var(--color-muted)', brand: 'var(--color-primary)' }
   const sizes: Record<string, string> = { h2: '1.875rem', h3: '1.5rem', h4: '1.25rem', h5: '1.125rem' }
   const weights: Record<string, number> = { h2: 800, h3: 700, h4: 700, h5: 600 }
-  const Tag = (level ?? 'h2') as 'h2' | 'h3' | 'h4' | 'h5'
+  const lvl = (level ?? 'h2') as 'h2' | 'h3' | 'h4' | 'h5'
+  // Reflect the Styles → Headings tokens per level, falling back to the built-in
+  // presets when unset. An explicit muted/brand colour choice still wins; the
+  // default "dark" defers to the heading colour token (then --color-fg).
+  const style: React.CSSProperties = {
+    fontFamily: `var(--${lvl}-family)`,
+    fontSize: `var(--${lvl}-size, ${sizes[lvl] ?? sizes.h2})`,
+    fontWeight: `var(--${lvl}-weight, ${weights[lvl] ?? 700})` as React.CSSProperties['fontWeight'],
+    lineHeight: `var(--${lvl}-line-height, 1.25)`,
+    letterSpacing: `var(--${lvl}-letter-spacing, normal)`,
+    textTransform: `var(--${lvl}-transform, none)` as React.CSSProperties['textTransform'],
+    fontStyle: `var(--${lvl}-style, normal)`,
+    color: colors[color] ?? `var(--${lvl}-color, var(--color-fg))`,
+    textAlign: align ?? 'left',
+    margin: '0 0 1rem',
+  }
+  const Tag = lvl
   return (
     <div style={{ padding: getPadding(padding) }} {...getAosProps(animationType, animationDuration, animationDelay)}>
-      <Tag style={{ fontSize: sizes[level] ?? sizes.h2, fontWeight: weights[level] ?? 700, color: colors[color] ?? colors.dark, textAlign: align ?? 'left', margin: '0 0 1rem', lineHeight: 1.25 }}>
+      <Tag style={style}>
         {text}
       </Tag>
     </div>
@@ -411,14 +427,31 @@ function Quote(props: any) {
 
 function ButtonLink(props: any) {
   const { label, href, variant, padding } = props
-  const styles: Record<string, React.CSSProperties> = {
-    primary: { background: 'var(--color-primary)', color: 'var(--color-bg)', border: 'none' },
-    secondary: { background: 'var(--color-fg-secondary)', color: 'var(--color-bg)', border: 'none' },
-    outline: { background: 'transparent', color: 'var(--color-primary)', border: '2px solid var(--color-primary)' },
+  // Shape + typography reflect the Styles → Buttons tokens (var), falling back to
+  // the built-in defaults when unset so untouched sites look identical.
+  const shape: React.CSSProperties = {
+    display: 'inline-block', textDecoration: 'none',
+    fontFamily: 'var(--btn-family)',
+    fontWeight: 'var(--btn-weight, 600)',
+    fontSize: 'var(--btn-size, 0.9375rem)',
+    lineHeight: 'var(--btn-line-height, normal)',
+    letterSpacing: 'var(--btn-letter-spacing, normal)',
+    textTransform: 'var(--btn-transform, none)' as React.CSSProperties['textTransform'],
+    fontStyle: 'var(--btn-style, normal)',
+    borderRadius: 'var(--btn-radius, 6px)',
+    padding: 'var(--btn-padding, 0.625rem 1.5rem)',
+  }
+  // Colours: the primary (default) button reflects the button colour tokens;
+  // secondary/outline keep their distinct identity but still pick up the global
+  // border width/colour. Hover is applied via the .cactus-btn rule (tokens.ts).
+  const variants: Record<string, React.CSSProperties> = {
+    primary:   { background: 'var(--btn-bg, var(--color-primary))', color: 'var(--btn-text-color, var(--color-bg))', border: 'var(--btn-border-width, 0) solid var(--btn-border, transparent)' },
+    secondary: { background: 'var(--color-fg-secondary)', color: 'var(--color-bg)', border: 'var(--btn-border-width, 0) solid var(--btn-border, transparent)' },
+    outline:   { background: 'transparent', color: 'var(--color-primary)', border: 'var(--btn-border-width, 2px) solid var(--btn-border, var(--color-primary))' },
   }
   return (
     <div style={{ marginBottom: '1rem', padding: getPadding(padding) }}>
-      <a href={href} style={{ display: 'inline-block', padding: '0.625rem 1.5rem', borderRadius: 6, fontWeight: 600, textDecoration: 'none', fontSize: '0.9375rem', ...(styles[variant] ?? styles.primary) }}>
+      <a href={href} className="cactus-btn" style={{ ...shape, ...(variants[variant] ?? variants.primary) }}>
         {label}
       </a>
     </div>
@@ -458,8 +491,9 @@ function ImageBlock(props: any) {
   }
   return (
     <figure style={{ margin: '0 0 1.5rem', padding: getPadding(padding) }} {...getAosProps(animationType, animationDuration, animationDelay)}>
+      {/* Border radius/colour/width reflect the Styles → Images tokens, defaulting to the original look. */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={mediaUrl} alt={alt ?? ''} style={{ width: '100%', height: 'auto', borderRadius: 6, display: 'block' }} />
+      <img src={mediaUrl} alt={alt ?? ''} style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 'var(--img-radius, 6px)', border: 'var(--img-border-width, 0) solid var(--img-border-color, transparent)' }} />
       {caption && <figcaption style={{ textAlign: 'center', fontSize: '0.875rem', color: 'var(--color-muted)', marginTop: '0.5rem' }}>{caption}</figcaption>}
     </figure>
   )

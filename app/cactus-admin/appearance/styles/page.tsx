@@ -153,10 +153,14 @@ export default function StylesPage() {
         body: JSON.stringify({ designTokens: tokens }),
       })
       if (!res.ok) { const d = await res.json(); setError(d.error ?? 'Save failed'); return false }
-      setSaved(true); dirtyRef.current = false; return true
+      setSaved(true); dirtyRef.current = false
+      // Re-render the server admin layout so its injected theme (primary colour +
+      // font) updates immediately, without needing a manual page reload.
+      router.refresh()
+      return true
     } catch { setError('Save failed'); return false }
     finally { setSaving(false) }
-  }, [tokens, dirtyRef])
+  }, [tokens, dirtyRef, router])
 
   const leaveNow = useCallback((href: string) => {
     dirtyRef.current = false
@@ -433,7 +437,7 @@ export default function StylesPage() {
             </Section>
 
             <Section title="Body text">
-              <TypoGroup value={tokens.themeStyle.body} onChange={patch => { setBody(patch as Partial<Typo>); setSaved(false) }} />
+              <TypoGroup value={tokens.themeStyle.body} onChange={patch => { setBody(patch as Partial<Typo>); setSaved(false) }} globalFonts={tokens.designSystem.fonts} />
               <ColourInput label="Text colour" value={tokens.themeStyle.body.colour} onChange={v => { setBody({ colour: v || undefined }); setSaved(false) }} colours={colours} />
             </Section>
           </>
@@ -453,7 +457,7 @@ export default function StylesPage() {
                   </button>
                   {openHeadings.has(tag) && (
                     <div style={{ padding: '0.875rem' }}>
-                      <TypoGroup value={tokens.themeStyle.headings[tag]} onChange={patch => { setHeading(tag, patch as Record<string, unknown>); setSaved(false) }} />
+                      <TypoGroup value={tokens.themeStyle.headings[tag]} onChange={patch => { setHeading(tag, patch as Record<string, unknown>); setSaved(false) }} globalFonts={tokens.designSystem.fonts} />
                       <ColourInput label="Colour" value={tokens.themeStyle.headings[tag].colour} onChange={v => { setHeading(tag, { colour: v || undefined }); setSaved(false) }} colours={colours} />
                     </div>
                   )}
@@ -467,7 +471,7 @@ export default function StylesPage() {
         {activeTab === 'buttons' && (
           <Section title="Buttons">
             <p style={{ fontSize: '0.875rem', color: 'var(--color-muted)', margin: '0 0 1rem' }}>Default button appearance for public pages. Individual Puck blocks may override these.</p>
-            <TypoGroup value={tokens.themeStyle.buttons.typo} onChange={patch => { setButtonTypo(patch); setSaved(false) }} />
+            <TypoGroup value={tokens.themeStyle.buttons.typo} onChange={patch => { setButtonTypo(patch); setSaved(false) }} globalFonts={tokens.designSystem.fonts} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
               <ColourInput label="Text colour" value={tokens.themeStyle.buttons.textColour} onChange={v => { setButtons({ textColour: v || undefined }); setSaved(false) }} colours={colours} />
               <ColourInput label="Background colour" value={tokens.themeStyle.buttons.bgColour} onChange={v => { setButtons({ bgColour: v || undefined }); setSaved(false) }} colours={colours} />
@@ -500,10 +504,10 @@ export default function StylesPage() {
           <Section title="Form fields">
             <p style={{ fontSize: '0.875rem', color: 'var(--color-muted)', margin: '0 0 1rem' }}>Styles applied to inputs, textareas, and selects on public pages.</p>
             <p style={{ fontSize: '0.8125rem', fontWeight: 600, margin: '0 0 0.5rem', color: 'var(--color-fg)' }}>Label typography</p>
-            <TypoGroup value={tokens.themeStyle.formFields.labelTypo} onChange={patch => { setLabelTypo(patch); setSaved(false) }} />
+            <TypoGroup value={tokens.themeStyle.formFields.labelTypo} onChange={patch => { setLabelTypo(patch); setSaved(false) }} globalFonts={tokens.designSystem.fonts} />
             <ColourInput label="Label colour" value={tokens.themeStyle.formFields.labelColour} onChange={v => { setFormFields({ labelColour: v || undefined }); setSaved(false) }} colours={colours} />
             <p style={{ fontSize: '0.8125rem', fontWeight: 600, margin: '1rem 0 0.5rem', color: 'var(--color-fg)' }}>Field typography</p>
-            <TypoGroup value={tokens.themeStyle.formFields.typo} onChange={patch => { setFieldTypo(patch); setSaved(false) }} />
+            <TypoGroup value={tokens.themeStyle.formFields.typo} onChange={patch => { setFieldTypo(patch); setSaved(false) }} globalFonts={tokens.designSystem.fonts} />
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '0.75rem' }}>
               <ColourInput label="Text colour" value={tokens.themeStyle.formFields.textColour} onChange={v => { setFormFields({ textColour: v || undefined }); setSaved(false) }} colours={colours} />
               <ColourInput label="Background colour" value={tokens.themeStyle.formFields.bgColour} onChange={v => { setFormFields({ bgColour: v || undefined }); setSaved(false) }} colours={colours} />
@@ -577,10 +581,10 @@ function ColourInput({ label, value, onChange, colours }: { label: string; value
   )
 }
 
-function TypoGroup({ value, onChange }: { value: Typo; onChange: (patch: Partial<Typo>) => void }) {
+function TypoGroup({ value, onChange, globalFonts }: { value: Typo; onChange: (patch: Partial<Typo>) => void; globalFonts?: GlobalFont[] }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-      <FontPickerField label="Font family" value={value.family ?? ''} onChange={v => onChange({ ...value, family: v || undefined })} />
+      <FontPickerField label="Font family" value={value.family ?? ''} onChange={v => onChange({ ...value, family: v || undefined })} globalFonts={globalFonts} />
       <SelectField label="Weight" value={value.weight} onChange={v => onChange({ ...value, weight: v || undefined })} options={FONT_WEIGHT_OPTIONS} />
       <TextField label="Size" value={value.size ?? ''} onChange={v => onChange({ ...value, size: v || undefined })} hint="e.g. 1rem" />
       <TextField label="Line height" value={value.lineHeight ?? ''} onChange={v => onChange({ ...value, lineHeight: v || undefined })} hint="e.g. 1.75" />
@@ -592,7 +596,7 @@ function TypoGroup({ value, onChange }: { value: Typo; onChange: (patch: Partial
   )
 }
 
-function FontPickerField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+function FontPickerField({ label, value, onChange, globalFonts }: { label: string; value: string; onChange: (v: string) => void; globalFonts?: GlobalFont[] }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const ref = useRef<HTMLDivElement>(null)
@@ -605,8 +609,14 @@ function FontPickerField({ label, value, onChange }: { label: string; value: str
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  const q = search.toLowerCase()
+  // Your named global fonts, offered first so they can be reused by name. Picking
+  // one stores its family value (what actually renders).
+  const filteredGlobals = (globalFonts ?? []).filter(f =>
+    f.family && (!q || f.name.toLowerCase().includes(q) || f.family.toLowerCase().includes(q))
+  )
   const filtered = search
-    ? POPULAR_FONTS.filter(f => f.toLowerCase().includes(search.toLowerCase()))
+    ? POPULAR_FONTS.filter(f => f.toLowerCase().includes(q))
     : POPULAR_FONTS
 
   return (
@@ -619,9 +629,26 @@ function FontPickerField({ label, value, onChange }: { label: string; value: str
         onFocus={() => { setSearch(''); setOpen(true) }}
         placeholder="e.g. Inter or system-ui, sans-serif"
       />
-      <span className="field-hint">Type to search or enter any CSS font-family value.</span>
-      {open && filtered.length > 0 && (
+      <span className="field-hint">Pick one of your fonts, search the list, or enter any CSS font-family value.</span>
+      {open && (filteredGlobals.length > 0 || filtered.length > 0) && (
         <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 20, background: 'var(--color-surface-raised)', border: '1px solid var(--color-border)', borderRadius: 6, boxShadow: '0 4px 16px rgba(0,0,0,0.1)', maxHeight: 220, overflowY: 'auto', marginTop: 2 }}>
+          {filteredGlobals.length > 0 && (
+            <>
+              <div style={{ padding: '0.375rem 0.75rem 0.25rem', fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-muted)' }}>Your fonts</div>
+              {filteredGlobals.map(f => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onMouseDown={e => { e.preventDefault(); onChange(f.family); setOpen(false) }}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem', width: '100%', textAlign: 'left', padding: '0.4375rem 0.75rem', background: f.family === value ? 'var(--color-success-bg)' : 'none', border: 'none', cursor: 'pointer', fontSize: '0.875rem', color: f.family === value ? 'var(--color-success)' : 'var(--color-fg)', fontFamily: f.family.includes(',') ? f.family : `${f.family}, sans-serif` }}
+                >
+                  <span>{f.name}</span>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--color-muted)', fontFamily: 'inherit' }}>{f.family}</span>
+                </button>
+              ))}
+              {filtered.length > 0 && <div style={{ borderTop: '1px solid var(--color-border)', margin: '0.25rem 0' }} />}
+            </>
+          )}
           {filtered.map(font => (
             <button
               key={font}
