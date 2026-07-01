@@ -21,6 +21,7 @@ type DbSubStep =
   | 'db-provisioning'      // Neon API call in flight
   | 'db-redeploying'       // DATABASE_URL written, waiting for Vercel redeploy + DB reachable
   | 'db-error'             // Neon API call failed — show error + fall back to manual
+  | 'db-local'             // local mode, DATABASE_URL absent → show .env.local instructions
 
 type EnvCheckData = {
   required: EnvVarStatus[]
@@ -29,6 +30,7 @@ type EnvCheckData = {
   databaseState: DatabaseState
   neonAvailable: boolean
   vercelConfigured: boolean
+  localMode: boolean
 }
 
 type ExistingDbState = {
@@ -167,6 +169,13 @@ export default function SetupPage() {
       .then((d: EnvCheckData) => {
         setEnvData(d)
 
+        // Local-development mode: there is no Vercel project to connect, so skip
+        // the connect step entirely and go straight to the database step.
+        if (d.localMode) {
+          setStep('database')
+          return
+        }
+
         // Vercel not configured → show vercel-config panel
         if (!d.vercelConfigured) {
           setDbSubStep('vercel-config')
@@ -205,6 +214,10 @@ export default function SetupPage() {
         setEnvData(d)
         if (d.databaseState === 'set') {
           setDbSubStep('ready')
+        } else if (d.localMode) {
+          // Local mode never writes DATABASE_URL or redeploys - the user sets it
+          // in .env.local. Show plain instructions rather than the Neon/Vercel panels.
+          setDbSubStep('db-local')
         } else if (d.databaseState === 'provisioned-redeploying') {
           setDbSubStep('db-redeploying')
           startRedeployPolling()
@@ -793,12 +806,43 @@ export default function SetupPage() {
                 <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Database connected</h2>
               </div>
               <p style={{ color: 'var(--color-muted)', fontSize: '0.9375rem', margin: '0 0 1.5rem' }}>
-                The redeploy is complete and the schema is ready.
+                {envData?.localMode
+                  ? 'Connected to the database in your .env.local and the schema is ready.'
+                  : 'The redeploy is complete and the schema is ready.'}
               </p>
               <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={() => handleSmartContinue()}>
                 Continue →
               </button>
             </>
+          )}
+
+          {dbSubStep === 'db-local' && (
+            <div>
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
+                <span style={{ color: 'var(--color-danger)', fontWeight: 700, flexShrink: 0 }}>✗</span>
+                <div>
+                  <code style={{ fontFamily: 'monospace', fontSize: '0.875rem' }}>DATABASE_URL</code>
+                  <div style={{ fontSize: '0.8125rem', color: 'var(--color-muted)' }}>Not set in your local environment.</div>
+                </div>
+              </div>
+              <div className="alert alert-info" style={{ fontSize: '0.875rem' }}>
+                <p style={{ margin: '0 0 0.5rem' }}>
+                  You&apos;re running Cactus Foundation in local-development mode. Add your
+                  database connection string to <code>.env.local</code>, apply the schema,
+                  then restart the dev server:
+                </p>
+                <pre style={{ margin: '0 0 0.5rem', padding: '0.625rem 0.75rem', background: 'var(--color-bg-subtle)', border: '1px solid var(--color-border)', borderRadius: 6, fontSize: '0.8125rem', overflowX: 'auto' }}>
+{`# .env.local
+DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
+
+npm run db:migrate
+npm run dev`}
+                </pre>
+                <p style={{ margin: 0 }}>
+                  Then reload this page - setup will continue from here.
+                </p>
+              </div>
+            </div>
           )}
 
           {dbSubStep === 'db-choice' && (

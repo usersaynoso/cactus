@@ -139,6 +139,7 @@ function StatusBadge({ set }: { set: boolean }) {
 }
 
 type CoreUpdateStatus =
+  | { localMode: true; currentVersion: string }
   | { configured: false }
   | { configured: true; error: string }
   | {
@@ -184,6 +185,19 @@ function UpdatesPanel() {
   }
 
   if (!status) return null
+
+  if ('localMode' in status) {
+    return (
+      <div style={{ marginBottom: '1.5rem' }}>
+        <div className="alert alert-info" style={{ fontSize: '0.875rem' }}>
+          You&rsquo;re running in local-development mode (v{status.currentVersion}). Core updates ship via git and a
+          Vercel redeploy, so they&rsquo;re managed outside the admin here - pull the latest Cactus Foundation release
+          and redeploy to update.
+        </div>
+        <hr style={{ border: 'none', borderTop: '1px solid var(--color-border)', margin: '1.5rem 0 0' }} />
+      </div>
+    )
+  }
 
   if (!status.configured) {
     return (
@@ -324,6 +338,9 @@ function ConfigPageInner() {
   // Env var state
   const [envStatus, setEnvStatus] = useState<Record<string, boolean>>({})
   const [envFields, setEnvFields] = useState<Record<string, string>>({})
+  // Local-development mode: env vars come from .env.local, so the editor is
+  // read-only and the Vercel-only "Reset Everything" action is hidden.
+  const [localMode, setLocalMode] = useState(false)
   const [savingEnvId, setSavingEnvId] = useState<string | null>(null)
   const [savedEnvId, setSavedEnvId] = useState<string | null>(null)
   const [envError, setEnvError] = useState('')
@@ -449,6 +466,7 @@ function ConfigPageInner() {
       setPages(pagesData.pages ?? [])
       setMenus((menusData as { menus?: MenuOption[] }).menus ?? [])
       setEnvStatus((envData as { vars?: Record<string, boolean> }).vars ?? {})
+      setLocalMode((envData as { localMode?: boolean }).localMode === true)
       // Pre-select SMTP mode if SMTP_HOST is set but BREVO_API_KEY is not
       if ((envData as { vars?: Record<string, boolean> }).vars?.['SMTP_HOST'] && !(envData as { vars?: Record<string, boolean> }).vars?.['BREVO_API_KEY']) {
         setEmailMode('smtp')
@@ -834,6 +852,11 @@ function ConfigPageInner() {
           </div>
           <StatusBadge set={isEnvSectionSet(allKeys)} />
         </div>
+        {localMode && (
+          <div className="alert alert-info" style={{ fontSize: '0.8125rem', marginBottom: '0.75rem' }}>
+            Managed via <code>.env.local</code> in local-development mode. Edit the file and restart the dev server to change these.
+          </div>
+        )}
         {section.keys.map((f) => (
           <div className="field" key={f.key}>
             <label style={{ fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
@@ -845,26 +868,31 @@ function ConfigPageInner() {
               autoComplete="off"
               value={envFields[f.key] ?? ''}
               onChange={(e) => setEnvField(f.key, e.target.value)}
-              placeholder={envStatus[f.key] ? 'Enter new value to change' : (f.placeholder ?? '')}
+              placeholder={localMode ? (envStatus[f.key] ? 'Set in .env.local' : 'Not set') : (envStatus[f.key] ? 'Enter new value to change' : (f.placeholder ?? ''))}
+              disabled={localMode}
               style={{ fontSize: '0.875rem' }}
             />
             {f.hint && <span className="field-hint">{f.hint}</span>}
           </div>
         ))}
-        {envError && savingEnvId === null && savedEnvId === null && (
-          <div className="alert alert-danger" style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>{envError}</div>
+        {!localMode && (
+          <>
+            {envError && savingEnvId === null && savedEnvId === null && (
+              <div className="alert alert-danger" style={{ fontSize: '0.875rem', marginBottom: '0.5rem' }}>{envError}</div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+              <button
+                className="btn btn-primary"
+                style={{ fontSize: '0.875rem' }}
+                disabled={isSaving || !hasEntries}
+                onClick={() => handleSaveEnv(section.id, allKeys)}
+              >
+                {isSaving ? 'Saving…' : isSaved ? '✓ Saved' : 'Save credentials'}
+              </button>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{isSaved ? 'Redeploying…' : 'Takes effect on next deployment'}</span>
+            </div>
+          </>
         )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <button
-            className="btn btn-primary"
-            style={{ fontSize: '0.875rem' }}
-            disabled={isSaving || !hasEntries}
-            onClick={() => handleSaveEnv(section.id, allKeys)}
-          >
-            {isSaving ? 'Saving…' : isSaved ? '✓ Saved' : 'Save credentials'}
-          </button>
-          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)' }}>{isSaved ? 'Redeploying…' : 'Takes effect on next deployment'}</span>
-        </div>
       </div>
     )
   }
@@ -1031,6 +1059,9 @@ function ConfigPageInner() {
               </div>
             )}
 
+            {/* Reset Everything deletes Vercel env vars - irrelevant in local mode. */}
+            {!localMode && (
+            <>
             <h3 style={{ fontSize: '0.9375rem', fontWeight: 600, marginBottom: '0.25rem' }}>Reset Everything</h3>
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginBottom: '1rem' }}>
               Permanently removes all environment variables from your Vercel project and resets the site to factory settings.
@@ -1101,6 +1132,8 @@ function ConfigPageInner() {
                   </div>
                 )}
               </div>
+            )}
+            </>
             )}
           </div>
         </div>
@@ -1449,6 +1482,11 @@ function ConfigPageInner() {
                   </div>
                   <StatusBadge set={envKeysForProvider(selected).every((k) => envStatus[k])} />
                 </div>
+                {localMode && (
+                  <div className="alert alert-info" style={{ fontSize: '0.8125rem', marginBottom: '0.75rem' }}>
+                    Managed via <code>.env.local</code> in local-development mode. Edit the file and restart the dev server to change these.
+                  </div>
+                )}
                 {selectedVars.map((f) => (
                   <div className="field" key={f.key}>
                     <label style={{ fontSize: '0.875rem', display: 'flex', justifyContent: 'space-between' }}>
@@ -1460,7 +1498,8 @@ function ConfigPageInner() {
                       autoComplete="off"
                       value={envFields[f.key] ?? ''}
                       onChange={(e) => setEnvField(f.key, e.target.value)}
-                      placeholder={envStatus[f.key] ? 'Enter new value to change' : (f.placeholder ?? '')}
+                      placeholder={localMode ? (envStatus[f.key] ? 'Set in .env.local' : 'Not set') : (envStatus[f.key] ? 'Enter new value to change' : (f.placeholder ?? ''))}
+                      disabled={localMode}
                       style={{ fontSize: '0.875rem' }}
                     />
                     {f.hint && <span className="field-hint">{f.hint}</span>}
@@ -1478,7 +1517,8 @@ function ConfigPageInner() {
                         autoComplete="off"
                         value={envFields[CLOUDFLARE_WORKER_VAR.key] ?? ''}
                         onChange={(e) => setEnvField(CLOUDFLARE_WORKER_VAR.key, e.target.value)}
-                        placeholder={envStatus[CLOUDFLARE_WORKER_VAR.key] ? 'Enter new value to change' : CLOUDFLARE_WORKER_VAR.placeholder}
+                        placeholder={localMode ? (envStatus[CLOUDFLARE_WORKER_VAR.key] ? 'Set in .env.local' : 'Not set') : (envStatus[CLOUDFLARE_WORKER_VAR.key] ? 'Enter new value to change' : CLOUDFLARE_WORKER_VAR.placeholder)}
+                        disabled={localMode}
                         style={{ fontSize: '0.875rem' }}
                       />
                       <span className="field-hint">{CLOUDFLARE_WORKER_VAR.hint}</span>
@@ -1489,15 +1529,19 @@ function ConfigPageInner() {
                     </div>
                   </>
                 )}
-                <button
-                  className="btn btn-primary"
-                  style={{ fontSize: '0.875rem' }}
-                  disabled={savingEnvId === `media-${selected}` || !envKeysForProvider(selected).some((k) => envFields[k]?.trim())}
-                  onClick={() => handleSaveEnv(`media-${selected}`, envKeysForProvider(selected))}
-                >
-                  {savingEnvId === `media-${selected}` ? 'Saving…' : savedEnvId === `media-${selected}` ? '✓ Saved' : 'Save credentials'}
-                </button>
-                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginLeft: '1rem' }}>{savedEnvId === `media-${selected}` ? 'Redeploying…' : 'Takes effect on next deployment'}</span>
+                {!localMode && (
+                  <>
+                    <button
+                      className="btn btn-primary"
+                      style={{ fontSize: '0.875rem' }}
+                      disabled={savingEnvId === `media-${selected}` || !envKeysForProvider(selected).some((k) => envFields[k]?.trim())}
+                      onClick={() => handleSaveEnv(`media-${selected}`, envKeysForProvider(selected))}
+                    >
+                      {savingEnvId === `media-${selected}` ? 'Saving…' : savedEnvId === `media-${selected}` ? '✓ Saved' : 'Save credentials'}
+                    </button>
+                    <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', marginLeft: '1rem' }}>{savedEnvId === `media-${selected}` ? 'Redeploying…' : 'Takes effect on next deployment'}</span>
+                  </>
+                )}
               </div>
             )}
 

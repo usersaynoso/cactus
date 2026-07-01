@@ -6,6 +6,7 @@ import { getSessionFromCookie, createSession, setSessionCookie } from '@/lib/aut
 import { refreshStarterLayouts } from '@/lib/setup/starterLayouts'
 import { upsertVercelEnvVar } from '@/lib/vercel/env'
 import { triggerVercelRedeploy } from '@/lib/vercel/deploy'
+import { isLocalMode } from '@/lib/config/env'
 
 export async function POST() {
   const cfg = await prisma.siteConfig.findUnique({
@@ -99,7 +100,11 @@ export async function POST() {
   // If it's missing, generate it now, write it to Vercel, and trigger a redeploy
   // so the new deployment picks it up. Auto-login is skipped because the current
   // process won't see the new env var until redeployed.
-  if (!process.env.SESSION_SECRET || !process.env.ENCRYPTION_KEY) {
+  //
+  // In local-development mode there is no Vercel project to write to and no
+  // redeploy: SESSION_SECRET / ENCRYPTION_KEY are expected in .env.local, so skip
+  // this block entirely and proceed to auto-login.
+  if (!isLocalMode() && (!process.env.SESSION_SECRET || !process.env.ENCRYPTION_KEY)) {
     const vercelToken = process.env.VERCEL_API_TOKEN
     const projectId = process.env.VERCEL_PROJECT_ID
     if (vercelToken && projectId) {

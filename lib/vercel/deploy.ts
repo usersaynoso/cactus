@@ -1,3 +1,5 @@
+import { isLocalMode } from '@/lib/config/env'
+
 const VERCEL_API = 'https://api.vercel.com'
 
 // Triggers a new Vercel production deployment based on the latest existing deployment
@@ -7,6 +9,10 @@ export async function triggerVercelRedeploy(
   token: string,
   projectId: string
 ): Promise<{ triggered: boolean; deploymentId?: string; error?: string }> {
+  // No Vercel control plane in local-development mode - nothing to redeploy.
+  if (isLocalMode()) {
+    return { triggered: false, error: 'Redeploys are not available in local-development mode' }
+  }
   try {
     // Find the most recent production deployment (any state — we just need the source).
     const listRes = await fetch(

@@ -5,7 +5,7 @@ import { getSessionFromCookie } from '@/lib/auth/session'
 import { hasPermission } from '@/lib/permissions/check'
 import { errorResponse } from '@/lib/utils'
 import { getLatestRelease, getLatestDeploymentStatus } from '@/lib/modules/github'
-import { getGitHubConfigStatus } from '@/lib/config/env'
+import { getGitHubConfigStatus, isLocalMode } from '@/lib/config/env'
 import { recordDeploymentNeeded } from '@/lib/notifications/deployment'
 import { recordModuleUpdate, clearAlert } from '@/lib/notifications/alerts'
 import { startDeferredRedeploy } from '@/lib/deploy/redeploy'
@@ -63,6 +63,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   if (action === 'update') {
+    if (isLocalMode()) {
+      return errorResponse('Module updates are not available in local-development mode. Update the module repo and redeploy on Vercel.', 503)
+    }
     const ghConfigStatus = await getGitHubConfigStatus()
     if (ghConfigStatus === 'app_not_installed') {
       return errorResponse(

@@ -64,6 +64,9 @@ export default function ModulesPage() {
   const [uninstallModal, setUninstallModal] = useState<UninstallModal | null>(null)
   const [uninstallMode, setUninstallMode] = useState<'code_only' | 'code_and_data'>('code_only')
   const [uninstalling, setUninstalling] = useState(false)
+  // Local-development mode: module updates need git push + Vercel redeploy, so the
+  // per-module Update button is hidden in favour of a short note.
+  const [localMode, setLocalMode] = useState(false)
 
   const loadDirectory = useCallback(async (refresh = false) => {
     try {
@@ -75,6 +78,7 @@ export default function ModulesPage() {
       const modules: DirectoryEntry[] = d.modules ?? []
       setEntries(modules)
       setDirectoryUnavailable(d.directoryUnavailable === true)
+      setLocalMode(d.localMode === true)
       if (ghRes.ok) {
         const gh = await ghRes.json()
         setGhStatus({ connected: gh.connected, hasInstallation: gh.hasInstallation, hasPat: gh.hasPat })
@@ -309,13 +313,19 @@ export default function ModulesPage() {
                               Release notes
                             </button>
                           )}
-                          <button
-                            className="btn btn-primary btn-sm"
-                            disabled={actionLoading[m.installedId ?? '']}
-                            onClick={() => m.installedId && handleAction(m.installedId, 'update')}
-                          >
-                            {actionLoading[m.installedId ?? ''] ? 'Updating…' : 'Update'}
-                          </button>
+                          {localMode ? (
+                            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-muted)', alignSelf: 'center' }}>
+                              Update via git + redeploy
+                            </span>
+                          ) : (
+                            <button
+                              className="btn btn-primary btn-sm"
+                              disabled={actionLoading[m.installedId ?? '']}
+                              onClick={() => m.installedId && handleAction(m.installedId, 'update')}
+                            >
+                              {actionLoading[m.installedId ?? ''] ? 'Updating…' : 'Update'}
+                            </button>
+                          )}
                         </>
                       )}
                       {m.status === 'active' && (

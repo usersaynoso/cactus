@@ -24,8 +24,9 @@ export async function GET() {
 
   // Raise (or clear) the on-demand "update available" notification so the bell
   // persists the reminder across the admin. Never let this break the endpoint.
+  // (Local mode never has an update available, so this clears any stale alert.)
   try {
-    if (status.configured && 'updateAvailable' in status && status.updateAvailable) {
+    if (!('localMode' in status) && status.configured && 'updateAvailable' in status && status.updateAvailable) {
       await recordCoreUpdate(status.latestVersion)
     } else {
       await clearAlert('core-update')
@@ -64,6 +65,9 @@ export async function POST() {
 
   // Fetch current status to get version numbers
   const status = await getCoreUpdateStatus()
+  if ('localMode' in status) {
+    return errorResponse('Core updates are not available in local-development mode. Update via git and redeploy on Vercel.', 503)
+  }
   if (!status.configured) {
     return errorResponse('Cannot determine update status — GitHub may not be configured.', 503)
   }

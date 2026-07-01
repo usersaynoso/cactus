@@ -14,6 +14,16 @@ export type EnvVarStatus = {
   gates?: string
 }
 
+// True when the app is NOT running on Vercel. Vercel injects VERCEL=1 into both
+// build and runtime; it is never set locally. We use its absence as the signal
+// for "local-development mode", where the Vercel control plane (env-var writes,
+// redeploys, core/module updates) is unavailable and config comes from .env.local.
+// A real Vercel deployment that simply hasn't connected its API token yet still
+// has VERCEL=1, so it is never misclassified as local.
+export function isLocalMode(): boolean {
+  return process.env.VERCEL !== '1'
+}
+
 // All environment variables the application reads, grouped by category.
 // This is the single source of truth for the setup env-check step and the
 // admin dashboard banner.
@@ -21,43 +31,54 @@ export function getEnvStatus(): {
   required: EnvVarStatus[]
   optional: EnvVarStatus[]
 } {
-  const required: EnvVarStatus[] = [
-    {
-      name: 'DATABASE_URL',
-      description: 'PostgreSQL pooled connection string. Can be provisioned automatically during setup.',
-      required: true,
-      set: !!process.env.DATABASE_URL,
-    },
-    {
-      name: 'VERCEL_API_TOKEN',
-      description:
-        'Vercel REST API token. Entered during setup — used for writing env vars, triggering redeployments, and provisioning databases.',
-      required: true,
-      set: !!process.env.VERCEL_API_TOKEN,
-    },
-    {
-      name: 'VERCEL_PROJECT_ID',
-      description:
-        'Vercel project ID. Selected during setup — identifies which project to configure.',
-      required: true,
-      set: !!process.env.VERCEL_PROJECT_ID,
-    },
-  ]
+  // Local-development mode flips which vars are mandatory: locally the user must
+  // supply DATABASE_URL, SESSION_SECRET and SITE_URL in .env.local, and the Vercel
+  // control-plane vars become optional (they're unused). On Vercel the reverse holds.
+  const local = isLocalMode()
+
+  const databaseUrl: EnvVarStatus = {
+    name: 'DATABASE_URL',
+    description: 'PostgreSQL pooled connection string. Can be provisioned automatically during setup.',
+    required: true,
+    set: !!process.env.DATABASE_URL,
+  }
+  const vercelApiToken: EnvVarStatus = {
+    name: 'VERCEL_API_TOKEN',
+    description:
+      'Vercel REST API token. Entered during setup - used for writing env vars, triggering redeployments, and provisioning databases. Not used in local-development mode.',
+    required: !local,
+    set: !!process.env.VERCEL_API_TOKEN,
+  }
+  const vercelProjectId: EnvVarStatus = {
+    name: 'VERCEL_PROJECT_ID',
+    description:
+      'Vercel project ID. Selected during setup - identifies which project to configure. Not used in local-development mode.',
+    required: !local,
+    set: !!process.env.VERCEL_PROJECT_ID,
+  }
+  const sessionSecret: EnvVarStatus = {
+    name: 'SESSION_SECRET',
+    description: local
+      ? 'Secret for signing session tokens (min 32 characters). Set it in .env.local: openssl rand -base64 32'
+      : 'Secret for signing session tokens (min 32 characters). Auto-generated during setup.',
+    required: local,
+    set: !!process.env.SESSION_SECRET,
+  }
+  const siteUrl: EnvVarStatus = {
+    name: 'SITE_URL',
+    description: local
+      ? 'Canonical public URL - also the WebAuthn relying party ID. Set it to http://localhost:3000 in .env.local.'
+      : 'Canonical public domain - also used as the WebAuthn relying party ID. Auto-detected from your Vercel project during setup.',
+    required: local,
+    set: !!process.env.SITE_URL,
+  }
+
+  const required: EnvVarStatus[] = local
+    ? [databaseUrl, sessionSecret, siteUrl]
+    : [databaseUrl, vercelApiToken, vercelProjectId]
 
   const optional: EnvVarStatus[] = [
-    {
-      name: 'SESSION_SECRET',
-      description: 'Secret for signing session tokens (min 32 characters). Auto-generated during setup.',
-      required: false,
-      set: !!process.env.SESSION_SECRET,
-    },
-    {
-      name: 'SITE_URL',
-      description:
-        'Canonical public domain — also used as the WebAuthn relying party ID. Auto-detected from your Vercel project during setup.',
-      required: false,
-      set: !!process.env.SITE_URL,
-    },
+    ...(local ? [vercelApiToken, vercelProjectId] : [sessionSecret, siteUrl]),
     {
       name: 'BREVO_API_KEY',
       description: 'Brevo transactional email API key',
