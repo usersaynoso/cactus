@@ -5,7 +5,7 @@ import { hasPermission } from '@/lib/permissions/check'
 import { prisma } from '@/lib/db/prisma'
 import AdminShell from '@/components/admin/AdminShell'
 import { getUnreadCount } from '@/lib/notifications/deployment'
-import { buildAdminThemeStyles } from '@/lib/design/tokens'
+import { buildAdminThemeStyles, buildFontHref } from '@/lib/design/tokens'
 import pkg from '@/package.json'
 import type { Metadata } from 'next'
 
@@ -55,13 +55,16 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     }
   }
 
-  // White-label the admin chrome to the site's primary colour. Only the
-  // --color-primary family is injected (see buildAdminThemeStyles) so admin
-  // spacing, radii and typography stay on the Cactus design system.
+  // White-label the admin chrome to the site's primary colour and font. Only the
+  // --color-primary family and --font-sans are injected (see buildAdminThemeStyles)
+  // so admin spacing, radii and the mono/code font stay on the Cactus design system.
   const adminThemeStyles = buildAdminThemeStyles(config?.designTokens)
+  // Load the site font(s) so the adopted --font-sans actually renders in admin.
+  const fontHref = buildFontHref(config?.designTokens)
 
   return (
     <>
+      {fontHref && <link rel="stylesheet" href={fontHref} />}
       {adminThemeStyles && <style dangerouslySetInnerHTML={{ __html: adminThemeStyles }} />}
       <AdminShell
         adminPath={adminPath}

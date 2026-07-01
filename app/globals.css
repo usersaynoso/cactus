@@ -325,7 +325,7 @@ body {
   font-size: var(--text-base);
   line-height: var(--leading-base);
   color: var(--color-text);
-  background: var(--color-bg);
+  background: var(--color-page-bg, var(--color-bg));
   -webkit-font-smoothing: antialiased;
 }
 

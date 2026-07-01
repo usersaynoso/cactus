@@ -45,7 +45,7 @@ function DropdownLink({ item, hasChildren }: { item: MenuItem; hasChildren: bool
         padding: '0.5rem 1rem',
         fontSize: '0.9rem',
         color: hovered ? 'var(--color-primary)' : 'var(--color-text)',
-        background: hovered ? 'var(--color-success-subtle)' : 'transparent',
+        background: hovered ? 'var(--color-primary-subtle)' : 'transparent',
         textDecoration: 'none',
         transition: 'color 0.15s, background 0.15s',
       }}
@@ -89,7 +89,7 @@ function DesktopNavItem({ item, overrides, depth = 0 }: {
             fontWeight: overrides?.fontWeight ?? 500,
             textTransform: overrides?.textTransform,
             color: hovered ? 'var(--color-primary)' : (overrides?.color ?? 'var(--color-text)'),
-            background: hovered ? 'var(--color-success-subtle)' : 'transparent',
+            background: hovered ? 'var(--color-primary-subtle)' : 'transparent',
             textDecoration: 'none',
             borderRadius: 6,
             transition: 'color 0.15s, background 0.15s',
